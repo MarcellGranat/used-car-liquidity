@@ -1,0 +1,643 @@
+---
+title: 'Liquidity in the Used Car Market: an Application of Survival Analysis'
+subtitle: Liquidity in the Used Car Market
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    keep_tex: yes
+    template: "oup-template.tex"
+author1: "Marcell P. Granát \\ORCID{0000-0002-4036-1500}"
+author2: "Péter Vékas \\ORCID{0000-0002-2626-814X}"
+adress1: \orgdiv{Faculty of Economics and Business}, \orgname{Jon von Neumann University},
+  \orgaddress{\street{Izsáki út 10.}, \postcode{6000}, \country{Hungary}}
+adress2: \orgdiv{Institute of Operations and Decision Sciences}, \orgname{Corvinus
+  University of Budapest}, \orgaddress{\street{Fővám tér 8.}, \postcode{1093}, \country{Hungary}}
+authormark: Granat and Vekas
+journal: 'Journal of the Royal Statistical Society. Series A: Statistics in Society'
+abstract: "`r granatlib::md_insert('markdown/abstract.md')`"
+keywords: Used car market, Market liquidity, Survival analysis, Webscraping, Machine learning, Multiple correspondence analysis
+bibliography: reference.bib
+params:
+  text_contained: yes
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,
+                      error = TRUE, 
+                      message = FALSE,
+                      warning = FALSE,
+                      fig.path = "figures/", 
+                      dev = "pdf",
+                      cache = FALSE,
+                      dpi = 400)
+```
+
+```{r}
+source("codes/utils.R")
+```
+
+# Introduction
+
+`r granatlib::md_insert("markdown/introduction1.md")`
+
+```{r dag, out.width="95%"}
+knitr::include_graphics("dag.png", auto_pdf = TRUE)
+```
+
+`r granatlib::md_insert("markdown/introduction2.md")`
+
+```{r mainsteps, out.width="95%"}
+knitr::include_graphics("mainsteps.png", auto_pdf = TRUE)
+```
+
+`r granatlib::md_insert("markdown/introduction3.md")`
+
+
+# Data
+
+## The source of the data
+
+`r granatlib::md_insert("markdown/source_of_the_data.md")`
+
+```{r}
+load("data/cars_data.RData")
+
+download_days <- prices_df %>% 
+  pull(date) %>% 
+  unique() %>% 
+  sort()
+```
+
+## Handling missing data {#impute}
+
+`r granatlib::md_insert("markdown/handling_missing_data.md")`
+
+```{r cars_visdat, dev='png'}
+load("data/cars_data.RData")
+names_to_select <- cars_data %>% 
+  names %>% 
+  NiceName() %>% 
+  enframe() %>% 
+  arrange(- str_length(value)) %>% 
+  pull()
+
+cars_data %>% 
+  sample_n(10000) %>% 
+  rename_all(NiceName) %>% 
+  select(names_to_select) %>% 
+  select(- Id) %>% 
+  rename_all(str_to_sentence) %>% 
+  rename_all(str_replace, " mot", " MOT") %>% 
+  visdat::vis_miss() +
+  theme(
+    plot.margin = margin(1,1.3,1,1, "cm")
+  )
+```
+
+```{r impute_knn}
+c("nyari_gumi_meret ~ brand + evjarat + sajat_tomeg",
+  "nyari_gumi_meret2 ~ brand + evjarat + sajat_tomeg",
+  "nyari_gumi_meret3 ~ brand + evjarat + sajat_tomeg",
+  "szallithato_szem_szama ~ brand + evjarat + sajat_tomeg",
+  "ajtok_szama ~ brand + evjarat + sajat_tomeg + szallithato_szem_szama",
+  "hengerurtartalom ~ brand + evjarat + szallithato_szem_szama",
+  "henger_elrendezes ~ brand + evjarat + hengerurtartalom + teljesitmeny",
+  "hajtas ~ brand + evjarat + teljesitmeny + uzemanyag",
+  "sajat_tomeg ~ brand + evjarat + teljesitmeny + szallithato_szem_szama + ajtok_szama",
+  "teljes_tomeg ~ brand + evjarat + teljesitmeny + szallithato_szem_szama + ajtok_szama",
+  "uzemanyag ~ brand + evjarat + teljesitmeny + hengerurtartalom",
+  "csomagtarto ~ brand + evjarat + szallithato_szem_szama + sajat_tomeg + teljes_tomeg") %>% 
+  enframe(name = NULL) %>% 
+  separate(value, c("imputed", "predictors"), "~") %>% 
+  mutate(predictors = map(predictors, ~ str_split(., "[+]")[[1]])) %>% 
+  unnest() %>% 
+  mutate_all(str_trim) %>% 
+  mutate_all(NiceName) %>% 
+  group_by(imputed) %>% 
+  summarise(predictors = str_c(predictors, collapse = ", ")) %>% 
+  set_names("Imputed variable", "Predictors") %>% 
+  mutate_all(str_to_sentence) %>% 
+  table_output(align = c("l", "l"))
+```
+
+```{r}
+load("data/mca.RData")
+```
+
+## Dimension reduction {#mca}
+
+`r granatlib::md_insert("markdown/dimension-reduction.md")`
+
+## Removing outliers {#outlier}
+
+`r granatlib::md_insert("markdown/removing-outliers.md")`
+
+## Explanatory data analyses {#eda}
+
+`r granatlib::md_insert("markdown/explanatory-data-analyses1.md")`
+
+```{r}
+load("data/setup.RData")
+```
+
+```{r price_stats}
+df %>% 
+  mutate(
+    qb = lubridate::floor_date(date, "quarter"),
+    qe = lubridate::ceiling_date(date, "quarter"),
+    qb = gsub("-01$", "", qb),
+    qe = gsub("-01$", "", qe),
+    qb = str_replace(qb, "-", "/"),
+    qe = str_replace(qe, "-", "/"),
+    Quarter = str_c(qb, "-", qe),
+  ) %>% 
+  group_by(Quarter) %>% 
+  tot_summarise(total_name = "Total",
+                Mean = mean(price),
+                Median = median(price),
+                `Standard deviation` = sd(price),
+                Skeness = moments::skewness(price),
+                Kurtosis = moments::kurtosis(price),
+  ) %>% 
+  arrange(as.character(Quarter)) %>% 
+  mutate_at(2:4, format, big.mark = ",") %>% 
+  table_output()
+```
+
+`r granatlib::md_insert("markdown/explanatory-data-analyses2.md")`
+
+```{r}
+load("data/cars_data_imputed.RData")
+```
+
+```{r}
+duration_df <- prices_df %>%
+  arrange(date) %>% 
+  group_by(id) %>% 
+  slice(1, n()) %>% # first and last
+  transmute(name = c("start", "end"), date) %>% 
+  pivot_wider(values_from = date, names_prefix = "date_") %>% 
+  ungroup() %>% 
+  filter(date_start != min(date_start)) %>% 
+  mutate(
+    duration = date_end  - date_start,
+    duration = as.numeric(duration),
+  )
+```
+
+```{r surv_curve, fig.height=4, fig.width=10}
+km_df <- duration_df %>% 
+  mutate(
+    qb = lubridate::floor_date(date_start, "quarter"),
+    qb = gsub("-01$", "", qb),
+    qe = lubridate::ceiling_date(date_start, "quarter"),
+    qe = gsub("-01$", "", qe),
+    q = str_c(qb, " - ", qe),
+    sold = date_end < "2022-03-01"
+  )
+
+km_all <- survfit(formula = Surv(duration, sold) ~ 1, data = km_df)
+
+ggsurvplot(
+  km_all, 
+  risk.table = FALSE,
+  conf.int = TRUE,      
+  xlim = c(0,250),     
+  legend = "none",
+  xlab = "Time since the given car ad first appeared (days)",
+  surv.scale = "percent",
+  risk.table.title = "Number of unsold cars",
+  break.time.by = 30, 
+  ggtheme = theme_bw()
+)
+```
+
+# Methodology
+
+`r granatlib::md_insert("markdown/methodology.md")`
+
+## Determining the market price {#price}
+
+`r granatlib::md_insert("markdown/determining-the-market-price1.md")`
+
+```{r runtime}
+runtime_df <- tibble::tribble(
+  ~ model, ~ runtime,
+  "boost_tree", 66280,
+  "lm", 4,
+  "mlp", 37353,
+  "nearest_neighbor", 213280,
+  "rand_forest", 60923,
+  "svm", 184857,
+  "tree", 814
+)
+
+NiceNameModel <- function(x) {
+  case_when(
+    x == "boost_tree" ~ "EXtreme Gradient Boosting Training",
+    x == "lm" ~ "Ordinary Least Squares",
+    x == "mlp" ~ "Single-hidden-layer neural network",
+    x == "nearest_neighbor" ~ "K-Nearest Neighbor",
+    x == "rand_forest" ~ "Random Forest",
+    x == "svm" ~ "Linear support vector machines",
+    x == "tree" ~ "Regression tree",
+    TRUE ~ x
+  )
+}
+
+base_tune <- list.files("data", full.names = TRUE) %>% 
+  keep(str_ends, "tune.RData") %>% 
+  enframe(name = NULL, value = "file_name") %>% 
+  mutate(
+    model = str_remove_all(file_name, "data/|.RData"),
+    tune = map2(model, file_name, ~ {load(.y); get(.x)}),
+    model = str_remove_all(model, "_tune"),
+  )
+
+base_tune %>% 
+  unnest() %>% 
+  select(model, .metrics) %>% 
+  distinct(model, .keep_all = TRUE) %>% 
+  mutate(
+    `# of hyperparameters` = map_dbl(.metrics, ~ ncol(.) - 4),
+    `# of parameter combinations` = map_dbl(.metrics, ~ nrow(.) / 2),
+  ) %>% 
+  left_join(runtime_df) %>%
+  select(- .metrics) %>% 
+  mutate(
+    model = NiceNameModel(model),
+    runtime = format(runtime, big.mark = ",")
+  ) %>% 
+  rename(Model = 1, `Runtime (seconds)` = runtime) %>% 
+  table_output()
+```
+
+`r granatlib::md_insert("markdown/determining-the-market-price2.md")`
+
+## Survival analysis {#surv}
+
+`r granatlib::md_insert("markdown/survival-analysis.md")`
+
+# Results {#res}
+
+## Predicting the price-to-value
+
+`r granatlib::md_insert("markdown/predicting-the-price-to-value1.md")`
+
+```{r tune_result, fig.height=3}
+testing_tune <- base_tune %>% 
+  mutate(
+    best = map(tune, show_best, metric = "rsq", n = 1),
+    best = map(best, select, mean, std_err)
+  ) %>% 
+  select(model, best) %>% 
+  unnest() %>% 
+  transmute(
+    model, testing_mean = mean, testing_stderr = std_err,
+    testing_ca = mean - std_err / (10^.5), testing_cf = mean + std_err / (10^.5)
+  ) %>% 
+  pivot_longer(-1) %>% 
+  separate(name, c("set", "indicator"), "_")
+
+
+load("data/base_predict_folds2.RData")
+
+validation_tune <- base_predict_folds2_df %>% 
+  select(testing) %>% 
+  unnest() %>% 
+  pivot_longer(-(1:2)) %>% 
+  group_by(id, name) %>% 
+  summarise(SST = sum((price-mean(price))^2), SSE = sum((price - value)^2), rsq = 1 - SSE / SST) %>% 
+  # TODO sample or population
+  group_by(name) %>% 
+  summarise(mean = mean(rsq), stderr = sd(rsq), ca = mean - stderr / (10^.5), cf = mean + stderr / (10^.5)) %>%
+  rename_at(-1, ~ str_c("validation_", .)) %>% 
+  rename(model = name) %>% 
+  pivot_longer(-1) %>% 
+  separate(name, c("set", "indicator"), "_")
+
+bind_rows(testing_tune, validation_tune) %>% 
+  pivot_wider(names_from = indicator) %>% 
+  mutate(
+    model = NiceNameModel(model),
+    mean_validation = ifelse(set == "validation", mean, 0),
+    model = fct_reorder(model, mean_validation),
+    set = str_to_sentence(set)
+  ) %>% 
+  mutate(set = ifelse(set == "Testing", "Validation", "Testing")) %>% 
+  ggplot(aes(y = model, group = set, color = set)) + 
+  geom_errorbar(aes(xmin = ca, xmax = cf), position = position_dodge(width = .5)) + 
+  geom_point(aes(x = mean), position= position_dodge(width = .5)) + 
+  scale_x_continuous(labels = ~scales::percent(., 1)) + 
+  labs(x = "R-squared", y = "Model", color = "CV sets") + 
+  theme_bw() + 
+  theme(legend.position = "bottom")
+```
+
+`r granatlib::md_insert("markdown/predicting-the-price-to-value2.md")`
+
+```{r vfm_stats}
+load("data/surv_raw_df.RData")
+
+surv_raw_df %>% 
+  mutate(
+    qb = lubridate::floor_date(date_end, "quarter"),
+    qe = lubridate::ceiling_date(date_end, "quarter"),
+    qb = gsub("-01$", "", qb),
+    qe = gsub("-01$", "", qe),
+    qb = str_replace(qb, "-", "/"),
+    qe = str_replace(qe, "-", "/"),
+    Quarter = str_c(qb, "-", qe),
+  ) %>% 
+  drop_na(price_diff) %>% 
+  group_by(Quarter) %>% 
+  tot_summarise(total_name = "Total",
+                `Min (%)` = min(price_diff),
+                `Lower quartile (%)` = quantile(price_diff, .25),
+                `Median (%)` = quantile(price_diff, .5),
+                `Higher quartile (%)` = quantile(price_diff, .75),
+                `Max (%)` = max(price_diff),
+                `Standard deviation (%p)` = scales::percent(sd(price_diff), accuracy = .01)
+  ) %>% 
+  mutate_at(2:6, ~ scales::percent(. - 1, .01)) %>% 
+  arrange(desc(Quarter)) %>% 
+  table_output()
+```
+
+## Results from survival analysis {#surv_result}
+
+`r granatlib::md_insert("markdown/results-from-survival-analysis1.md")`
+
+```{r cvfit, fig.height=3}
+load("data/surv_raw_df.RData")
+
+n_used <- 1e4
+set.seed(123)
+
+surv_cv_df <- total_surv_df %>% 
+  filter(duration > 0) %>% 
+  sample_n(n_used)
+
+x_cv <- surv_cv_df %>%
+  select(- duration, - sold) %>% 
+  recipe() %>% 
+  step_dummy(all_nominal()) %>% 
+  prep() %>% 
+  juice() %>% 
+  as.matrix()
+
+y_cv <- surv_cv_df %>%
+  select(time = duration, status = sold) %>% 
+  as.matrix()
+
+tictoc::tic(str_c("surv_lasso", n_used))
+cvfit <- cv.glmnet(x_cv, y_cv, family = "cox", type.measure = "C")
+granatlib::stoc()
+
+x <- total_surv_df %>% 
+  filter(duration > 0) %>% 
+  select(- duration, - sold)
+
+y <- total_surv_df %>%
+  filter(duration > 0) %>% 
+  select(time = duration, status = sold) %>% 
+  as.matrix()
+
+fit_1se <- glmnet(x, y, family = "cox", lambda = cvfit$lambda.1se)
+
+plot(cvfit)
+```
+
+`r granatlib::md_insert("markdown/results-from-survival-analysis2.md")`
+
+```{r}
+surv_cv_df <- total_surv_df %>% 
+  filter(price_diff <= quantile(price_diff, .95) & price_diff >= quantile(price_diff, .05)) %>% 
+  filter(duration > 0) %>% 
+  sample_n(n_used)
+
+x_cv <- surv_cv_df %>%
+  select(- duration, - sold) %>% 
+  recipe() %>% 
+  step_dummy(all_nominal()) %>% 
+  prep() %>% 
+  juice() %>% 
+  as.matrix()
+
+y_cv <- surv_cv_df %>%
+  select(time = duration, status = sold) %>% 
+  as.matrix()
+
+tictoc::tic(str_c("surv_lasso", n_used))
+cvfit <- cv.glmnet(x_cv, y_cv, family = "cox", type.measure = "C")
+granatlib::stoc()
+
+x <- total_surv_df %>% 
+  filter(price_diff <= quantile(price_diff, .95) & price_diff >= quantile(price_diff, .05)) %>% 
+  filter(duration > 0) %>% 
+  select(- duration, - sold)
+
+y <- total_surv_df %>%
+  filter(price_diff <= quantile(price_diff, .95) & price_diff >= quantile(price_diff, .05)) %>% 
+  filter(duration > 0) %>% 
+  select(time = duration, status = sold) %>% 
+  as.matrix()
+
+fit_1se_r <- glmnet(x, y, family = "cox", lambda = cvfit$lambda.1se)
+```
+
+```{r}
+coef_1se <- broom::tidy(fit_1se) %>% 
+  mutate(exp_estimate = exp(estimate))
+
+fit_cox <- coef_1se %>% 
+  pull(term) %>% 
+  select(.data = total_surv_df, duration, sold) %>% 
+  coxph(formula = Surv(duration, sold) ~ .)
+
+coef_1se_r <- broom::tidy(fit_1se_r) %>% 
+  mutate(exp_estimate = exp(estimate))
+
+fit_cox_r <- coef_1se_r %>% 
+  pull(term) %>% 
+  select(.data = total_surv_df, duration, sold) %>% 
+  filter(price_diff <= quantile(price_diff, .95) & price_diff >= quantile(price_diff, .05)) %>% 
+  coxph(formula = Surv(duration, sold) ~ .)
+```
+
+```{r coefs, fig.height=9}
+full_join(tidy(fit_cox, conf.int = T), tidy(fit_cox_r, conf.int = T), by = "term") %>% 
+  filter(!is.na(estimate.x) & !is.na(estimate.y)) %>% 
+  pivot_longer(-term) %>% 
+  mutate(
+    model = ifelse(str_detect(name, ".x"), "All observations", "Inter-ventile"),
+    name = str_remove(name, ".x|.y"),
+    term = NiceName(term)
+  ) %>% 
+  pivot_wider() %>% 
+  mutate(g = row_number() / n() > .5) %>% 
+  ggplot(aes(y = term, color = model)) +
+  geom_vline(xintercept = 0) +
+  geom_point(aes(x = estimate), position = position_dodge(width = .5), alpha = .8) +
+  geom_errorbar(aes(xmin = conf.low, xmax = conf.high), position = position_dodge(width = .5), alpha = .8) +
+  theme_bw() +
+  theme(
+    strip.text = element_blank(),
+    legend.position = "bottom"
+  ) +
+  labs(
+    color = NULL, x = "Estimated coefficient", y = "Term"
+  )
+```
+
+`r granatlib::md_insert("markdown/results-from-survival-analysis3.md")`
+
+```{r}
+predict_quantile_prob <- function(.fit, .data, .probs = c(.25, .5, .75), .keep_predictor = TRUE) {
+  probablity_df <- predict(.fit, newdata = .data, response = "lp") %>% 
+    tibble(lp = .) %>% 
+    mutate(ci = exp(lp), id = row_number()) %>% 
+    crossing(basehaz(.fit)) %>% 
+    mutate(probability = exp(- hazard * ci))
+  
+  predicted_times_df <- map(.probs, function(x) {
+    filter(probablity_df, probability <= x) %>% 
+      distinct(id, .keep_all = TRUE) %>% 
+      # > First time where the probability of surviving is less than the given prob
+      select(id, time) %>%
+      set_names("id", str_c("time_", x))
+  })  %>%
+    reduce(full_join, by = "id")  %>%
+    right_join(
+      probablity_df %>% 
+        select(id) %>% 
+        distinct()
+    ) %>% 
+    arrange(id)
+  
+  if (.keep_predictor) {
+    
+    predicted_times_df <- bind_cols(
+      .data %>% 
+        select_if(~ n_distinct(.) > 1),
+      predicted_times_df %>% 
+        select(- id)
+    )
+  } 
+  predicted_times_df
+}
+```
+
+```{r}
+partial_effect_data <- function(.data, .var, n = 100, integer = TRUE, cut_quantile = c(.1, .9)) {
+  partial_values <- pull(total_surv_df, .var)
+  if (is.numeric(partial_values)) {
+    partial_quantials <- seq(from = quantile(partial_values, cut_quantile[1]), to = quantile(partial_values, cut_quantile[2]), length.out = n)
+    if (integer) {
+      partial_quantials <- unique(round(partial_quantials))
+    }
+  } else {
+    partial_quantials <- unique(partial_values) %>% 
+      na.omit()
+  }
+  
+  partial_quantials_df <- enframe(partial_quantials, name = NULL) %>% 
+    set_names(.var)
+  
+  most_freq <- function(x) {
+    x %>%
+      na.omit() %>%
+      enframe() %>%
+      count(value, sort = TRUE) %>%
+      pull(1) %>%
+      first()
+  }
+  
+  .data %>%
+    select(- .var) %>%
+    summarise(
+      across(where(is.numeric), median, na.rm = TRUE),
+      across(where(~ !is.numeric(.)), most_freq)
+    ) %>% 
+    crossing(partial_quantials_df) %>% 
+    select(names(.data))
+}
+```
+
+```{r}
+cox_design_df <- fit_1se %>% 
+  broom::tidy() %>% 
+  pull(term) %>% 
+  select(.data = total_surv_df, duration, sold)
+```
+
+```{r plotmo_valueformoney}
+cox_design_df %>% 
+  partial_effect_data("price_diff", integer = FALSE, cut_quantile = c(0, 1), n = 100) %>% 
+  predict_quantile_prob(.fit = fit_cox, seq(from = .1, to = .9, by = .1)) %>% 
+  pivot_longer(- 1) %>% 
+  mutate(
+    name = str_remove(name, "time_"),
+    name = as.numeric(name),
+    l = ifelse(name == min(name), str_c("Probablity of selling=", scales::percent(1 - name, 1)), scales::percent(1 - name, 1)),
+    l = fct_reorder(l, name)
+  ) %>% 
+  ggplot() +
+  aes(price_diff, value, label = l, group = name, fill = l) +
+  geom_area(position = position_dodge(), show.legend = FALSE) +
+  geomtextpath::geom_textline(aes(color = name == .5, linewidth = name ==.5), show.legend = FALSE) +
+  scale_fill_brewer(palette = 3) +
+  scale_x_continuous(expand = c(0, 0), labels = scales::percent) +
+  scale_y_continuous(expand = c(0, 0)) +
+  labs(x = "Offer price / Predicted price", y = "Days to sell") +
+  scale_color_manual(values = c("black", "red2"))
+```
+
+```{r results='hide'}
+survfit(formula = Surv(duration, sold) ~ amerikai_modell, data = total_surv_df) %>% 
+  broom::tidy() %>% 
+  group_by(strata) %>% 
+  filter(estimate >= .5) %>% 
+  slice_max(time, n = 1)
+```
+
+```{r results='hide'}
+survfit(formula = Surv(duration, sold) ~ bemutato_jarmu, data = total_surv_df) %>% 
+  broom::tidy() %>% 
+  group_by(strata) %>% 
+  filter(estimate >= .5) %>% 
+  slice_max(time, n = 1)
+```
+
+`r granatlib::md_insert("markdown/results-from-survival-analysis4.md")`
+
+# Conclusion {#con}
+
+`r granatlib::md_insert("markdown/conclusion.md")`
+
+# Discussion
+
+`r granatlib::md_insert("markdown/discussion.md")`
+
+# Appendix {-}
+
+# Download dates {#calendar}
+
+```{r calendar, fig.width=9, results='hide'}
+invisible(
+  Sys.setlocale("LC_TIME", "C") # mac os specific language setup
+)
+
+calendR::calendR(
+  start_date = "2021-05-01",
+  end_date =  "2022-02-28",
+  special.col = "lightblue",
+  special.days = download_days - as.Date("2021-04-30"),
+  start = "M"
+)
+```
+
+Starting in mid-August 2021, We were able to run the data download code on a
+personal server, so the daily download became more regular from then on.
