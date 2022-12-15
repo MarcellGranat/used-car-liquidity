@@ -1,0 +1,328 @@
+---
+title: 'Liquidity in the Used Car Market: an Application of Survival Analysis'
+subtitle: Liquidity in the Used Car Market
+date: "2022-12-14"
+output:
+  pdf_document:
+    keep_tex: yes
+    template: "oup-template.tex"
+author1: "Marcell P. Granát \\ORCID{0000-0002-4036-1500}"
+author2: "Péter Vékas \\ORCID{0000-0002-2626-814X}"
+adress1: \orgdiv{Faculty of Economics and Business}, \orgname{Jon von Neumann University},
+  \orgaddress{\street{Izsáki út 10.}, \postcode{6000}, \country{Hungary}}
+adress2: \orgdiv{Institute of Operations and Decision Sciences}, \orgname{Corvinus
+  University of Budapest}, \orgaddress{\street{Fővám tér 8.}, \postcode{1093}, \country{Hungary}}
+authormark: Granat and Vekas
+journal: 'Journal of the Royal Statistical Society. Series A: Statistics in Society'
+abstract: "Cars are major items in the household consumption basket, so participants in this market make their decisions based on carefully considered arguments. After a few years of use, it is very common to offer a vehicle for sale on the used car market, where it is an important question how long it will take to sell. In this paper, we present a survival model based on a large dataset of used car ads which we collected from the Internet by webscraping, revealing what makes a used car liquid, which is valuable knowledge for all participants in this market.  Clearly, one of the most important causes is the price-to-value ratio, which can be derived from the offer price and the price estimated by machine learning models (Ordinary Least Squares, Regression Tree, Random Forest, eXtreme Gradient Boosting, K-Nearest Neighbors, Neural Network, Support Vector Machine). These can provide reliable estimates in a dataset that contains a large number of variables. For computational reasons, we reduced the dimensionality of the data by Multiple Correspondence Analysis.
+
+The results show that: (1) eXtreme Gradient Boosting significantly outperforms other prediction methods in estimating the price-to-value ratio; (2) which is indeed the most important determinant of the time to sell and (3) and some other features of cars can be identified to influence selling prices, such as whether they were American models, exhibit cars, or had an amplifier output.
+"
+keywords: Used car market, Market liquidity, Survival analysis, Webscraping, Machine learning, Multiple correspondence analysis
+bibliography: reference.bib
+params:
+  text_contained: yes
+editor_options: 
+  chunk_output_type: console
+---
+
+
+
+
+
+# Introduction
+
+A car is one of the most expensive consumer durables on a household's bill, so buyers make their decisions based on carefully considered principles. Obviously, the most important consideration is the price-to-value ratio. These vehicles are commonly sold on the used car market after use. For this reason, it is important to know how much owners can sell their cars for and how long it will take.
+
+It is simple economics that if someone sells the same car cheaper on the second-hand market, it is likely to find a buyer sooner. However, the value of every vehicle is different, so to determine how quickly it will be sold at a given offer price, the value of the car must first be calculated. \$5,000 can be very expensive for an old car with many miles, but it would be cheap for a lightly used one. Therefore, the correlation between price-to-value and the duration of the sale is worth investigating. But in addition to price, many other factors can affect how quickly a vehicle can be sold. As an extreme example, a pink car will certainly attract fewer buyers than a black one.
+
+The market is not stable over time, and the economic environment can have a relevant impact. In 2021, The  \citet{kshprice} documented a 4.5\% price increase in vehicle purchases. Price fluctuations may also be due to changes in the exchange rate, as numerous used automobiles are imported into Hungary.
+
+Consumers' car purchases may also be affected by the economic cycle. After the crisis, in 2010, a total of 61,324 passenger cars were placed on the market for the first time in Hungary, compared to 149,137 in 2000 and 295,431 in 2018 \citep{kshyearbook}. 
+
+
+<img src="dag.png" title="plot of chunk dag" alt="plot of chunk dag" width="95%" />
+
+Thus, it is likely that the economic environment may have an impact on the used car market over a period of time, but as the study explains later (Section \ref{data}), the data do not allow a methodologically correct examination of this. However, this must be taken into account when analysing the factors mentioned above.
+
+Understanding these mechanisms will provide valuable information to all players in the used car market. Dealers' planning can be helped by knowing how quickly they will be able to dispose of the assets they currently hold, which may have storage costs and capacity constraints. In the event of capacity constraints, it may be worth reducing the offer price for cars whose selling time is significantly affected.
+
+And it helps buyers to consider not only price-to-value, but also how quickly they will be able to sell the car, as this may become a relevant problem for them years later.
+
+This study focuses on two research questions: (Q1) the **relationship between price-to-value and selling time** and (Q2) the **other vehicle characteristics that can influence selling time**. Figure \ref{fig:dag} visualises the theoretical framework outlined above in which the questions are discussed.
+
+
+<img src="mainsteps.png" title="plot of chunk mainsteps" alt="plot of chunk mainsteps" width="95%" />
+
+We used webscraping to collect data regularly between May 2021 and March 2022, thus containing hundreds of thousands of observations and 250 observed characteristics. The steps to download and clean the data are described in Section \ref{data}, while the properties of the market supply relevant to the study are presented in Section \ref{eda}.
+
+All downloaded cars are unique, and we price them using several machine learning methodologies (Ordinary Least Squares, Regression Tree, Random Forest, eXtreme Gradient Boosting, K-Nearest Neighbor, Neural Network, Support Vector Machine). In this step of the paper, the goal is to find the *model with the best predictive power*, while interpreting the effects is not a priority. However, prediction with more than 250 predictors is highly demanding from a computational standpoint, thus we reduced the dimension of binary variables using *Multiple Correspondence Analysis* (MCA), which is presented in Section \ref{mca}, while the models determining price-to-value are described in Section \ref{price}.
+
+Using the calculated relative price, one can determine how quickly a given car is expected to sell in the market at a given price. This requires a statistical model whose output variable is a time interval. For this purpose, the survival model is applied in Section \ref{surv}. The main steps of the study listed above are summarised in Figure \ref{fig:mainsteps}.
+
+
+
+# Data
+
+## The source of the data
+
+The starting point of the analysis is the data downloaded daily from the website [https://www.hasznaltauto.hu](https://www.hasznaltauto.hu), which has the highest traffic in Hungary^[Based on the introduction of the website: [https://www.hasznaltauto.hu/araink](https://www.hasznaltauto.hu/araink)]. During the scraping, the IDs and prices of all cars available on a given day were collected, as well as all available information about the vehicle ads that were first available that day. The latter simplification is intended to reduce the computational need for regular data downloads and the memory size of the data collected, by assuming that all technical details of a given car remain constant over the period it is advertised, while the offer price can change frequently (e.g., due to exchange rate fluctuations if the price is denominated in a foreign currency).
+
+This paper is based on data collected over 10 months. Due to technical difficulties, it has not been possible to download all data daily without omission, but with a personal computer dedicated to this purpose, the process will continue without interruption in the future. The figure in the appendix shows the days on which data were downloaded. Data from a total of 613,604 ads were downloaded throughout the period.
+
+Although one cannot be absolutely sure, we make the assumption that if a car is available on the website one day but not the next, it has been sold at the last listed price^[My personal experience is that dealers do not really budge on the advertised price, or take the vehicle off the site immediately after purchase.].
+
+The temporary disappearance of a car can also be due to a down payment^[Also personal experience with dealers.], so for the purpose of compiling the data for the analysis, we consider as sold until March 2022 all cars which had not been listed on the website until March 14, when we completed the analysis. Due to the regular downloading, it is known when a particular car ad started and ended, so it is possible to calculate how long it took to sell, which is used in Chapter \ref{surv}.
+
+An important technical detail for the analysis is that three types of data are linked to each car during data collection. The (1) **identifiers and prices**, which are downloaded daily. (2) **General characteristics** of the car, which are available for all cars (rarely refused to be filled in). These include the number of kilometres driven, the year, engine power, etc. These 23 variables are categorical or numeric (see the full list in Figure \ref{fig:cars_visdat}). And there are (3) **accessories** e.g., cruise control, bluetooth, leather seats. These are listed in the description of the cars and have been handled in the following way: all the accessories that occur have been listed, and binary (whether the car has them or not) variables have been created. This created a total of 235 dummy variables, from which we later created factor scores using MCA to reduce the number of dimensions.
+
+
+
+
+## Handling missing data {#impute}
+
+We imputed missing general characteristics by the K-Nearest-Neighbour (KNN) procedure. The ratio of missing data points is shown in Figure \ref{fig:cars_visdat} for each variable. The applied distance function was Gower's distance \citep[p.~5]{liao_missing_2014}, which can be used for mixtures of nominal and numeric data.
+
+Once the five nearest neighbours are determined, the mode is used to predict the nominal variables and the mean is used for the numeric data. Applying all possible explanatory variables during imputation is very computationally demanding in the KNN algorithm (see Chapter \ref{price}), so we used only the most important predictors for the variables to be imputed based on theoretical considerations^[For example, car tyres have 3 possible sizes, and we considered this variable to be categorical, as tyre sizes are usually characteristics of a car type, strongly related to the price of the car, but not linearly, i.e., there are sizes that are significantly more expensive for premium models. This step was motivated by the advice of Schnell Service 2000 Ltd. (car tyre manufacturer and distributor).]. Table \ref{tab:impute_knn} details all imputed variables along with the predictors that we used to determine the nearest neighbours.
+
+
+![plot of chunk cars_visdat](figures/cars_visdat-1.png)
+
+
+```
+## # A tibble: 12 × 2
+##    `Imputed variable`            Predictors                                                 
+##    <chr>                         <chr>                                                      
+##  1 Cylinder capacity             Brand, year of manufacture, number of persons transported  
+##  2 Cylinder layout               Brand, year of manufacture, cylinder capacity, engine perf…
+##  3 Number of doors               Brand, year of manufacture, own weight, number of persons …
+##  4 Number of persons transported Brand, year of manufacture, own weight                     
+##  5 Own weight                    Brand, year of manufacture, engine performance, number of …
+##  6 Tire size 1                   Brand, year of manufacture, own weight                     
+##  7 Tire size 2                   Brand, year of manufacture, own weight                     
+##  8 Tire size 3                   Brand, year of manufacture, own weight                     
+##  9 Total weight                  Brand, year of manufacture, engine performance, number of …
+## 10 Trunk                         Brand, year of manufacture, number of persons transported,…
+## 11 Type of fuel                  Brand, year of manufacture, engine performance, cylinder c…
+## 12 Wheel drive                   Brand, year of manufacture, engine performance, type of fu…
+```
+
+
+
+## Dimension reduction {#mca}
+
+Estimating relative prices for cars with machine learning models is a very computationally demanding task. However, the goal is to maximise the accuracy of predicting the prices of hundreds of thousands of cars, not to interpret the effects. For this reason, it is worth reducing the dimension of variables so that the algorithms do not conflict with memory or time constraints.
+
+Principal component analysis (*PCA*) is a widely used method for generating a new set of artificial variables that capture the most information about the original data. It is an advantageous tool if the multicollinearity among the predictors is high or if we have numerous predictors and the computational capacities are not enough to estimate our model \citep{sharma_study_2015}.
+
+Like PCA, *Multiple Correspondence Analysis* (MCA) performs dimension reduction, but it can be applied to categorical variables rather than numerical ones \citep{abdi2007multiple}. This methodology is better suited to our problem, as the majority of characteristics are represented by dummy variables. Out of the general variables, only the brand was included in the MCA analysis, as it had so many levels that it was worth applying dimension reduction to it. It is also worth including here for theoretical reasons, as the brand could be significantly intertwined with the accessories of cars, so it is expected to share a common pattern with dummy variables^[The barrier caused by the oversized dimension occurred during the first model runs. The inclusion of brands in the MCA analysis was also a problem because the R package applied to the random forest modelling (*randomForest*) did not allow a variable with more than 50 levels to be included in the model.]. MCA is described in detail in \citet{venables2013modern}.
+
+The next important question is how many of the factor scores are worth keeping: with fewer variables, the estimation of later models becomes faster, but the retained information decreases. The usual method in this case is to apply the rule of thumb outlined by \citet{kaiser1960application}: factors with eigenvalues exceeding the average of the eigenvalues are worth keeping. This has resulted in 236 total factors^[While this seems still a lot since we started with 235 categorical variables, several latter models handle the original variables with one-hot encoding, leading to more than 600 variables, so we achieved a significant reduction in computational demand.].
+
+
+## Removing outliers {#outlier}
+
+There may be intentional or unintentional typos in filled-in advertising forms. The most critical ones for our analysis are the ones where the offer price is not given correctly.
+
+There may have been an unintended input if a major change is detected in a car’s offer price (IDs and prices have been downloaded daily). We excluded cars from the analysis if a 400\% or greater difference was observed between their highest and lowest offer prices, which only affected 100 cars out of 613,604. In most cases, prices of these cars were multiplied by a power of 10, so presumably, the introduction of the unit of measure caused the typo (e.g., thousands of Hungarian Forints instead of Hungarian Forints).
+
+Ads for which the sale price is below HUF 300,000 or above HUF 30,000,000 were also ignored. This was the case for about 10,000 vehicles, with prices commonly being HUF 1, which was presumably entered to show the car in front of the advertisements in ascending order by price. In a few cases, we found ads with prices above HUF 30,000,000, which may have been the case of the input error mentioned in the previous paragraph, as it could not be worth that amount based on the car's technical details, and including it would have completely impaired the accuracy of the estimates. The lower and upper limits given above are based on browsing the ads on the website, and these are realistic values for a car.
+
+We also removed cars for which the mileage was not reported, as this is likely to have a strong influence on the price-to-value, and imputing it would lead to very noisy estimates.
+
+After removing all outliers and handling missing data, the modelling was performed on a total of 566,998 complete observations.
+
+
+## Explanatory data analyses {#eda}
+
+As the correlation between the time to sell a car and its offer price is the focus of this study, it is worth taking a closer look at the distribution of offer prices in Table \ref{tab:price_stats}. As it can be seen in the table, prices on the second-hand car market also increased during the observation period, not only in the total vehicle market, as reported by the \citet{kshprice}. The descriptive statistics also revealed the strongly positively skewed (the tail on the right side of the distribution is longer) and leptokurtic (data have heavy tails and outliers) distribution of the prices, hence we used the logarithm of the offer price for modelling.
+
+
+
+
+
+```
+## # A tibble: 5 × 6
+## # Groups:   Quarter [5]
+##   Quarter         Mean      Median    `Standard deviation` Skeness Kurtosis
+##   <fct>           <chr>     <chr>     <chr>                  <dbl>    <dbl>
+## 1 2021/04-2021/07 3,710,100 1,949,000 4,821,653               2.80     11.6
+## 2 2021/07-2021/10 3,774,025 1,950,000 4,883,133               2.73     11.2
+## 3 2021/10-2022/01 3,904,783 1,990,000 5,057,759               2.63     10.3
+## 4 2022/01-2022/04 4,068,776 2,200,000 4,873,486               2.52     10.1
+## 5 Total           3,871,298 1,999,000 4,931,980               2.66     10.7
+```
+
+In addition to the offer price, the time to sell is a crucial variable in this analysis. One frequently applied way to visualise the distribution of durations is the *Kaplan-Meier estimate of the survival function*. The survival function $G$ gives the probability that the event time $T$ (the time to sell in the current case) exceeds a given time $t$ \citep{gareth2013introduction}:
+
+\begin{equation} \label{eq:G}
+    G(t) = \probP(T \ge t)
+\end{equation}
+
+The estimated survival function is visualised in Figure \ref{fig:surv_curve}. The median survival time was 11 days, which means that cars were sold within 11 days with a probability of 50\%. Not surprisingly^[Selling duration has an effective lower bound (0), but no upper bound (length of observation window in our case).], the average survival time is significantly higher, 21.1 days. This reveals that the distribution of selling time is also positively skewed.
+
+
+
+
+
+
+![plot of chunk surv_curve](figures/surv_curve-1.pdf)
+
+# Methodology
+
+To understand the effect of the price-to-value ratio on selling times, we first determined the price-to-value ratio and then used it to create a survival model of selling times. Therefore, we describe the applied methodology in two separate subsections. Section \ref{price} presents the methods used to determine the price-to-value, while Section \ref{surv} describes our survival model.
+
+
+## Determining the market price {#price}
+
+As we do not aim to explore the causal effects that influence the sale price but instead, we need accurate estimates of true market prices, it is more appropriate to apply 'black box' methodologies instead of standard statistical models (such as ordinary least squares) for this purpose: for example, regression trees, random forests, eXtreme gradient boosting, K-Nearest
+
+Neighbors, neural networks and support vector machines. For a detailed description of the models see \citet{gareth2013introduction}.
+
+When applying these methods, it is of paramount importance to apply hyperparameter tuning and address the issue of overfitting \citep{kuhn2013over}. We performed *stratified k-fold cross-validation* on a random sample of 10,000 observations sold until July (filtering out the inflation; see the latter paragraph) for this purpose. We used a random sample in order to reduce the computational demands, and further random sampling within the quartiles of the offer price to make the folds balanced with respect to offer prices. We measured predictive accuracy by the mean $R^2$ in the 10 validation samples.
+
+We tested different numbers of hyperparameter combinations for each model during tuning as the models had different numbers of hyperparameters and runtimes. Table \ref{tab:runtime} shows how many hyperparameters needed to be tuned, how many hyperparameter combinations were tested, and how long this took^[CPU: Apple M1 Pro (8 cores in parallel, the combination numbers of the tested hyperparameters are therefore multiples of 8), RAM: 16 GB] per model.
+
+
+
+```
+## # A tibble: 7 × 4
+##   Model                              `# of hyperparamete…` `# of paramete…` `Runtime (seco…`
+##   <chr>                                              <dbl>            <dbl> <chr>           
+## 1 EXtreme Gradient Boosting Training                     7              128 " 66,280"       
+## 2 Ordinary Least Squares                                 0                1 "      4"       
+## 3 Single-hidden-layer neural network                     3               46 " 37,353"       
+## 4 K-Nearest Neighbor                                     3               32 "213,280"       
+## 5 Random Forest                                          2               32 " 60,923"       
+## 6 Linear support vector machines                         3              128 "184,857"       
+## 7 Regression tree                                        3               64 "    814"
+```
+
+Another issue is that supply prices have generally increased in the market (see Table \ref{tab:price_stats}). Therefore, we put cars into groups of 10,000 items by increasing order of sales time and built separate models for all subsamples to estimate market prices, thus filtering out inflation during the period. As there are also cars that were already available before March 2022 but have not yet been sold, we estimate prices of unsold cars with a model that was made on the last subsample of sold cars.
+
+After tuning, we selected the best model out of 7 contestants on a test sample of 10,000 cars sold before July 2021.
+
+
+## Survival analysis {#surv}
+
+Once we have estimated prices by 'black box' models, we used the ratios of those to the offer prices in order to determine the price-to-value, which we further used in addition to the characteristics of cars to estimate *selling durations* by the **Cox proportional hazards regression model** \citep{cox1972regression}.
+
+This model expresses *hazard rates* of observations as a function of explanatory variables. The hazard rate ($h$) is derived (Equation \ref{eq:h}) from the survival function (see Equation \ref{eq:G}) and can be interpreted as the intensity process.
+
+\begin{equation} \label{eq:h}
+        h(t)=\lim _{\Delta \searrow 0} \frac{\mathbb{P}(T<t+\Delta \mid T \geq t)}{\Delta}=\frac{f(t)}{G(t)}
+\end{equation}
+
+The assumption of the model is that the explanatory variables have a *proportional effect on the intensity process* (equation \ref{eq:lnc}), and this effect is constant over time (equation \ref{eq:hi}).
+
+\begin{equation} \label{eq:hi}
+  h_{i}(t)=c_{i} h_{0}(t),
+\end{equation}
+
+\begin{equation} \label{eq:lnc}
+    \ln c_{i}=\sum_{j=1}^{p} \beta_{j} x_{i j},
+\end{equation}
+
+where $i$ refers to individual cars and $j$ refers to explanatory variables.
+
+The latter assumption is crucially related to the validity of the Cox model. The time-invariant effect of predictors can be tested formally using the scaled Schoenfeld residuals \citep{grambsch1994proportional}. 
+
+Just as with standard regression models, fitting a model with 250 explanatory variables can be noisy, as it is hard to find the significant explanatory variables. Thus, we used LASSO (least absolute shrinkage and selection operator) regularization to filter the relevant regressors. To find the optimal $\lambda$ penalty hyperparameter in LASSO, we applied k-fold cross-validation and selected the highest $\lambda$ within 1 standard error of the best value for feature selection \citep{glmnet}. This process is visualised in Figure \ref{fig:cvfit}. In contrast to simple regression models, the goodness of fit of the model is measured by concordance indicators, which represent the proportion of cases where a car estimated to be a better seller was actually sold earlier (concordant pair). One commonly used (and available in the R programming language) measure is the Harell C index, which is simply the proportion of concordant pairs in the total concordant and discordant (when the car estimated with the higher intensity is sold later) pairs \citep{schmid2016use}. The possible values of C-index are between 0 and 1, but 0.5 equals the accuracy of a meaningless survival model. The tuning of $\lambda$ is another computationally demanding process, thus we only involved 10,000 observations for that (but later used all observations for the Cox model).
+
+After variable selection, we fit the unregularized Cox model, because the LASSO-based model introduces bias by shrinking the coefficients of all variables towards zero, and does not provide information on the significance of the predictors (confidence intervals, p-values).
+
+
+# Results {#res}
+
+## Predicting the price-to-value
+
+The main results of the models used to estimate the price-to-value ratio are visualised in Figure \ref{fig:tune_result}, while the predictive performance on the validation set for each combination of hyperparameters is shown in more detail in \ref{tuning}.
+
+
+![plot of chunk tune_result](figures/tune_result-1.pdf)
+
+In Figure \ref{fig:tune_result}, it can be seen that the *EXtreme Gradient Boosting Training* model (XGBoost) has the best predictive capacity, and although it has a smaller average $R^2$ in the test set than in the validation set, it still performs significantly better than all other models (no overlapping confidence intervals). The outstanding performance of XGBoost is not entirely surprising, as previous scientific studies have also documented \citep{nguyen2020predicting, sheridan2016extreme}.
+
+As mentioned, the term price-to-value denotes the proportion of the offer price and the predicted price. Using the predictions of XGBoost, these values can be calculated. Table \ref{tab:vfm_stats} reports the quartiles and standard deviation of the values. Their differences from 1 are usually small; 50\% of the offer prices do not differ from the predicted values by more than 3\%. However, the most overpriced car is offered for more than three times its worth based on the estimation. This value is still acceptable\footnote{Not surprisingly, since cars with outlier offer prices are ignored in the analysis; see Chapter \ref{outlier}.}, but it is a reasonable requirement to check the survival model by omitting these outlier values (robustness check).
+
+
+
+```
+## # A tibble: 5 × 7
+## # Groups:   Quarter [5]
+##   Quarter         `Min (%)` `Lower quartile (%)` `Median (%)` `Higher quartile (…` `Max (%)`
+##   <fct>           <chr>     <chr>                <chr>        <chr>                <chr>    
+## 1 2021/04-2021/07 -48.13%   -2.83%               -0.08%       2.66%                61.95%   
+## 2 2021/07-2021/10 -51.17%   -2.69%               0.06%        2.87%                208.45%  
+## 3 2021/10-2022/01 -50.43%   -2.75%               0.07%        2.96%                198.91%  
+## 4 2022/01-2022/04 -47.48%   -2.63%               0.10%        2.89%                124.62%  
+## 5 Total           -51.17%   -2.72%               0.06%        2.89%                208.45%  
+## # … with 1 more variable: `Standard deviation (%p)` <chr>
+```
+
+## Results from survival analysis {#surv_result}
+
+LASSO yielded $\lambda=0.0178$, which led to a model with a total of 55 predictors.
+
+
+![plot of chunk cvfit](figures/cvfit-1.pdf)
+
+To ensure robustness, we ran the feature selection algorithm and estimated the Cox model with and without dropping the lowest and highest 5\% of price-to-value. However, results were almost identical, so the model is robust in this respect. Figure \ref{fig:coefs} visualises the estimated coefficients for both modelling frameworks. The figure shows no considerable differences between the two models, the same terms were selected in the LASSO model, and the confidence intervals of the estimated coefficients overlap for all variables. 
+
+
+
+
+
+
+![plot of chunk coefs](figures/coefs-1.pdf)
+
+Since the variables are standardised in the Cox regression, price-to-value can be interpreted as the most important predictor to influence selling times due to its largest absolute coefficient and its sign is in line with our expectation. The logarithm of the intensity process is regressed with the predictors; thus the negative sign refers to a higher selling time if everything else is unchanged.
+
+To demonstrate the magnitude of the effect, the model response to the change in price-to-value is visualised in Figure \ref{fig:plotmo_valueformoney}. The figure highlights that significantly overpriced cars are sold very slowly indeed compared all cars in general. Although the typical cases (5\% relative differences from the estimated price) are not shown well in the figure^[One reason for this is that the function we wrote to calculate the partial effect can only visualise discrete values, thus the figure would not add much compared to describing the values.]. 
+
+The estimated median selling time of a car whose offer price exactly equals the predicted price is 14 days, and it decreases to 13 days if the car is underpriced by 4\%, and increases to 15 days if overpriced by 7\%. Thus the price-to-value itself usually does not have a very strong impact on the selling price, but it can if the predicted price is very far from the offered one.
+
+
+
+
+
+
+
+
+![plot of chunk plotmo_valueformoney](figures/plotmo_valueformoney-1.pdf)
+
+
+
+
+
+If the car is an American model, it significantly increases the selling time: the median selling time of American cars is 22 days, while it is only 11 days for non-American automobiles. The reason is that American cars are produced with different standards and it is harder to find mechanical parts in Hungary. However, this may be not a problem for some customers, thus the price-to-value is not lower, only the expected selling time is higher, because of the smaller potential pool of customers. Similarly, the median selling time for exhibited cars is 33 days. Over time, it is likely that one can find a buyer who does not mind if the car was exhibited, but many would rather not buy it.
+
+From the estimated coefficients, we would also highlight the amplifier output, which correlates with a significantly shorter expected sales time. However, the causal effect of this variable is questionable, as this characteristic is likely to correlate with other characteristics that may be attractive to young people (stickers, lighting, etc.).
+
+Cylinder type 'Other' also leads to increased selling times, but only a few thousand cars have it, and most of them were made by Subaru (47\%), thus it is reasonable to assume that this variable is selected because it correlates with unobserved characteristics of the car. However, interpreting other coefficients requires expert knowledge related to car dealership, so we do not wish to interpret additional coefficients.
+
+
+# Conclusion {#con}
+
+In summary, our results show that: (1) XGBoost significantly outperforms other machine learning methods in estimating the price-to-value, (2) the price-to-value is indeed the most important predictor affecting times to sell and (3) some other features of cars can be identified to influence selling prices, such as whether they were American brands, exhibit cars, or had an amplifier output.
+
+
+# Discussion
+
+Our analysis has the following limitations.
+
+*One can not be sure if the last observed price was the actual selling price, since bargaining is possible.* Ignoring this in the analysis was a necessary assumption since we cannot control for this in online scraped data.
+
+The assumption of proportional hazards in equation \ref{eq:hi} means that the effect of predictors is time-invariant, which may be tested formally using the scaled Schoenfeld residuals \citep{grambsch1994proportional}. This *assumption is violated*, which could be remedied by extending the original Cox regression model with time-dependent covariates \citep{zhang2018time, fisher1999time}. The proportional hazards assumption is routinely accepted in practice nevertheless, and extending the model in this direction is beyond the scope of this paper.
+
+Additionally, as we only observed 10 months, the effect of the economic environment cannot be distinguished from the one-off effect of the pandemic (the restrictions were lifted in the summer). For these reasons, we wish to continue the research in the future with a sufficient number of observations to analyse the effect of the economic environment and re-estimate the model with time-varying covariates \citep{zhang2018time}. 
+
+
+# Appendix {-}
+
+# Download dates {#calendar}
+
+![plot of chunk calendar](figures/calendar-1.pdf)
+
+Starting in mid-August 2021, We were able to run the data download code on a
+personal server, so the daily download became more regular from then on.
