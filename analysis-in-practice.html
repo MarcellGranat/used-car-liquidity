@@ -144,7 +144,7 @@ the vehicles
 
 #### Daily scrape
 
-&lt;embed src="figures/unnamed-chunk-7-1.pdf" width="700px" height="450px" style="display: block; margin: auto;" type="application/pdf" /&gt;
+&lt;img src="analysis-in-practice_files/figure-html/unnamed-chunk-7-1.png" width="700px" height="450px" style="display: block; margin: auto;" /&gt;
 
 ---
 
@@ -158,6 +158,10 @@ class: inverse, center, middle
 
 ## Detailed information about the cars
 
+
+```r
+cars_data
+```
 
 ```
 ## # A tibble: 613,614 × 24
@@ -212,6 +216,10 @@ class: inverse, center, middle
 
 
 
+```r
+prices_df
+```
+
 ```
 ## # A tibble: 12,409,519 × 3
 ##    id          price date      
@@ -252,7 +260,7 @@ class: inverse, center, middle
 
 #### Handling missing data
 
-&lt;img src="figures/cars_visdat-1.png" width="700px" height="450px" style="display: block; margin: auto;" /&gt;
+&lt;img src="analysis-in-practice_files/figure-html/cars_visdat-1.png" width="700px" height="450px" style="display: block; margin: auto;" /&gt;
 
 ---
 
@@ -265,6 +273,24 @@ class: inverse, center, middle
 - Imputation based on **KNN** using only the presumably relevant variables
 
 
+```r
+knn_impute &lt;- function(.data, formula, ...) {
+  outcome &lt;- gsub("~.*", "", formula) %&gt;% 
+    str_trim()
+  
+  predictors &lt;- gsub(".* ~", "", formula) %&gt;% 
+    str_split("\\+") %&gt;% 
+    reduce(c) %&gt;% 
+    str_trim()
+  
+  recipe(.data) %&gt;% 
+    step_normalize(all_numeric(), -outcome) %&gt;% 
+*   step_impute_knn(outcome, impute_with = predictors, ...) %&gt;% 
+    prep(retain = TRUE) %&gt;% 
+    juice() %&gt;% 
+    select(outcome)
+}
+```
 
 ---
 
@@ -311,6 +337,29 @@ Source: [Wikipedia](https://en.wikipedia.org/wiki/K-nearest_neighbors_algorithm)
 #### Cleaning
 
 
+```r
+szin = case_when(
+  str_detect(szin, "kék") ~ "kek", 
+  str_detect(szin, "ibolya") ~ "kek", 
+  str_detect(szin, "türkiz") ~ "kek", 
+  str_detect(szin, "piros") ~ "piros", 
+  str_detect(szin, "vörös") ~ "piros",
+  str_detect(szin, "bordó") ~ "piros",
+  str_detect(szin, "fekete") ~ "fekete",
+  str_detect(szin, "szürke") ~ "szurke",
+  str_detect(szin, "ezüst") ~ "szurke",
+  str_detect(szin, "fehér") ~ "feher",
+  str_detect(szin, "barna") ~ "barna",
+  str_detect(szin, "homok") ~ "barna",
+  str_detect(szin, "pezsgő") ~ "barna",
+  str_detect(szin, "bézs") ~ "barna",
+  str_detect(szin, "vaj") ~ "barna",
+  str_detect(szin, "zöld") ~ "zold",
+  str_detect(szin, "sárga") ~ "sarga",
+  str_detect(szin, "narancs") ~ "sarga",
+  str_detect(szin, "lila") ~ "lila",
+*     TRUE ~ "other"),
+```
 
 ---
 
@@ -319,6 +368,11 @@ Source: [Wikipedia](https://en.wikipedia.org/wiki/K-nearest_neighbors_algorithm)
 #### Cleaning
 
 
+```r
+filter(!is.na(kilometerora_allasa) &amp; !is.na(evjarat)) %&gt;% 
+  # evjarat ~ 1000 cars
+  filter(kilometerora_allasa &gt; 0)
+```
 
 ---
 
@@ -327,6 +381,26 @@ Source: [Wikipedia](https://en.wikipedia.org/wiki/K-nearest_neighbors_algorithm)
 #### Cleaning
 
 
+```r
+price_change_df &lt;- prices_df %&gt;% 
+  group_by(id) %&gt;% 
+  summarise(
+    min_price = min(price, na.rm = TRUE),
+    max_price = max(price, na.rm = TRUE),
+*   price_change = max_price / min_price
+  )
+
+combined_df %&gt;% 
+  anti_join(
+    price_change_df %&gt;% 
+*     filter(price_change &gt; 5) %&gt;% 
+      # unrealistic jump in price ~ 100 cars
+      select(id)
+  ) %&gt;% 
+* filter(price &lt;= 3e7 &amp; price &gt;= 3e5 &amp; !is.na(fct_1)) %&gt;%  
+  # unrealistic prices ~ 15 000 cars
+  na.omit()
+```
 
 ---
 
@@ -351,6 +425,27 @@ Source: [Wikipedia](https://en.wikipedia.org/wiki/K-nearest_neighbors_algorithm)
 #### Dimension reduction
 
 
+```r
+training_df &lt;- factor_df %&gt;% 
+  group_by_at(setdiff(names(additional_factor_df), "id")) %&gt;%
+  sample_frac(., size=.05) %&gt;%
+  ungroup() %&gt;%
+  na.omit() %&gt;% 
+  select(where(~ n_distinct(.) &gt; 1), -id) %&gt;% 
+  mutate_all(as.character) %&gt;% 
+  mutate_all(as.factor)
+
+n_factor &lt;- training_df %&gt;% 
+  FactoMineR::MCA(graph = FALSE) %&gt;% 
+  # can calculate n_factor only from {FactoMineR}
+  factoextra::get_eigenvalue() %&gt;% 
+  data.frame() %&gt;% 
+* filter(eigenvalue &gt; mean(eigenvalue)) %&gt;% 
+  nrow()
+
+fit_mca &lt;- training_df %&gt;% 
+* MASS::mca(nf = n_factor) # can predict only w {MASS}
+```
 
 ---
 
@@ -359,6 +454,16 @@ Source: [Wikipedia](https://en.wikipedia.org/wiki/K-nearest_neighbors_algorithm)
 #### Dimension reduction
 
 
+```r
+mca_factor_df &lt;- factor_df %&gt;% 
+  select(names(training_df)) %&gt;% 
+  mutate_all(as.character) %&gt;% 
+  mutate_all(as.factor) %&gt;% 
+  group_by(cut(row_number(), 100)) %&gt;% 
+  # split the df to 100 pieces to avoid memory overload
+  group_map(~.) %&gt;% 
+* map(~ data.frame(predict(object = fit_mca, newdata = .)))
+```
 
 --
 
@@ -395,6 +500,11 @@ class: middle, center
 
 
 
+```r
+training_df %&gt;% 
+  sample_n(1e4) %&gt;% 
+  vfold_cv(strata = price, v = 10)
+```
 
 ---
 
@@ -421,6 +531,12 @@ class: middle, center
 &lt;img src="recipes.png" width="300px" height="300px" style="display: block; margin: auto;" /&gt;
 
 
+```r
+recipe(price ~ ., data = training_df) %&gt;% 
+* step_log(all_outcomes()) %&gt;% 
+  step_rm(id, date) %&gt;% 
+* step_normalize(all_numeric())
+```
 
 ---
 
@@ -463,37 +579,37 @@ class: middle, center
 
 ## Determining the market price
 
-&lt;embed src="figures/unnamed-chunk-26-1.pdf" width="700px" height="450px" style="display: block; margin: auto;" type="application/pdf" /&gt;
+&lt;img src="analysis-in-practice_files/figure-html/unnamed-chunk-26-1.png" width="700px" height="450px" style="display: block; margin: auto;" /&gt;
 
 ---
 
 ## Determining the market price
 
-&lt;embed src="figures/unnamed-chunk-27-1.pdf" width="700px" height="450px" style="display: block; margin: auto;" type="application/pdf" /&gt;
+&lt;img src="analysis-in-practice_files/figure-html/unnamed-chunk-27-1.png" width="700px" height="450px" style="display: block; margin: auto;" /&gt;
 
 ---
 
 ## Determining the market price
 
-&lt;embed src="figures/unnamed-chunk-28-1.pdf" width="700px" height="450px" style="display: block; margin: auto;" type="application/pdf" /&gt;
+&lt;img src="analysis-in-practice_files/figure-html/unnamed-chunk-28-1.png" width="700px" height="450px" style="display: block; margin: auto;" /&gt;
 
 ---
 
 ## Determining the market price
 
-&lt;embed src="figures/unnamed-chunk-29-1.pdf" width="700px" height="450px" style="display: block; margin: auto;" type="application/pdf" /&gt;
+&lt;img src="analysis-in-practice_files/figure-html/unnamed-chunk-29-1.png" width="700px" height="450px" style="display: block; margin: auto;" /&gt;
 
 ---
 
 ## Determining the market price
 
-&lt;embed src="figures/unnamed-chunk-30-1.pdf" width="700px" height="450px" style="display: block; margin: auto;" type="application/pdf" /&gt;
+&lt;img src="analysis-in-practice_files/figure-html/unnamed-chunk-30-1.png" width="700px" height="450px" style="display: block; margin: auto;" /&gt;
 
 ---
 
 ## Determining the market price
 
-&lt;embed src="figures/unnamed-chunk-31-1.pdf" width="700px" height="450px" style="display: block; margin: auto;" type="application/pdf" /&gt;
+&lt;img src="analysis-in-practice_files/figure-html/unnamed-chunk-31-1.png" width="700px" height="450px" style="display: block; margin: auto;" /&gt;
 
 ---
 
@@ -501,7 +617,7 @@ class: middle, center
 
 #### Comparing the estimation accuracy of the investigated models
 
-&lt;embed src="figures/unnamed-chunk-32-1.pdf" width="700px" height="450px" style="display: block; margin: auto;" type="application/pdf" /&gt;
+&lt;img src="analysis-in-practice_files/figure-html/unnamed-chunk-32-1.png" width="700px" height="450px" style="display: block; margin: auto;" /&gt;
 
 ---
 
@@ -532,7 +648,7 @@ class: inverse, middle, center
 
 #### Survival curve showing the probability of not having disappeared from the supply
 
-&lt;embed src="figures/unnamed-chunk-34-1.pdf" width="700px" height="450px" style="display: block; margin: auto;" type="application/pdf" /&gt;
+&lt;img src="analysis-in-practice_files/figure-html/unnamed-chunk-34-1.png" width="700px" height="450px" style="display: block; margin: auto;" /&gt;
 
 ---
 
@@ -594,7 +710,7 @@ where `\(i\)` refers to individual cars and `\(j\)` refers to explanatory variab
 
 #### K-fold cross-validation for finding the optimal lambda hyperparameter
 
-&lt;embed src="figures/unnamed-chunk-35-1.pdf" width="700px" height="450px" style="display: block; margin: auto;" type="application/pdf" /&gt;
+&lt;img src="analysis-in-practice_files/figure-html/unnamed-chunk-35-1.png" width="700px" height="450px" style="display: block; margin: auto;" /&gt;
 
 ---
 
@@ -602,7 +718,7 @@ where `\(i\)` refers to individual cars and `\(j\)` refers to explanatory variab
 
 #### Estimated coefficients of the Cox models
 
-&lt;embed src="figures/unnamed-chunk-36-1.pdf" width="700px" height="450px" style="display: block; margin: auto;" type="application/pdf" /&gt;
+&lt;img src="analysis-in-practice_files/figure-html/unnamed-chunk-36-1.png" width="700px" height="450px" style="display: block; margin: auto;" /&gt;
 
 ---
 
@@ -610,7 +726,7 @@ where `\(i\)` refers to individual cars and `\(j\)` refers to explanatory variab
 
 #### Estimated coefficients of the Cox models
 
-&lt;embed src="figures/unnamed-chunk-37-1.pdf" width="700px" height="450px" style="display: block; margin: auto;" type="application/pdf" /&gt;
+&lt;img src="analysis-in-practice_files/figure-html/unnamed-chunk-37-1.png" width="700px" height="450px" style="display: block; margin: auto;" /&gt;
 
 ---
 
@@ -618,7 +734,7 @@ where `\(i\)` refers to individual cars and `\(j\)` refers to explanatory variab
 
 #### Survival model's response to the change of price-to-value
 
-&lt;embed src="figures/unnamed-chunk-38-1.pdf" width="700px" height="350px" style="display: block; margin: auto;" type="application/pdf" /&gt;
+&lt;img src="analysis-in-practice_files/figure-html/unnamed-chunk-38-1.png" width="700px" height="350px" style="display: block; margin: auto;" /&gt;
 
 *To capture the partial effect of price-to-value assuming that all other variables are unchanged, numeric predictors are fixed at their medians, while categorical and logical variables are fixed at their modes. The monotone increasing red line means that if the price-to-value is lower (the ratio of the offer price to the predicted price is higher), then the median selling time is higher.*
 
