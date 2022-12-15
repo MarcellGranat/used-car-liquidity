@@ -1,0 +1,1015 @@
+<!DOCTYPE html>
+<html lang="" xml:lang="">
+  <head>
+    <title>Liquidity in the Used Car Market</title>
+    <meta charset="utf-8" />
+    <meta name="author" content="Marcell Granát" />
+    <meta name="date" content="2022-01-01" />
+    <script src="libs/header-attrs/header-attrs.js"></script>
+    <link href="libs/remark-css/default.css" rel="stylesheet" />
+    <link href="libs/remark-css/default-fonts.css" rel="stylesheet" />
+    <link href="libs/panelset/panelset.css" rel="stylesheet" />
+    <script src="libs/panelset/panelset.js"></script>
+    <link href="libs/tile-view/tile-view.css" rel="stylesheet" />
+    <script src="libs/tile-view/tile-view.js"></script>
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, title-slide
+
+.title[
+# Liquidity in the Used Car Market
+]
+.subtitle[
+## <img src="mnb_intezet.png" style="width:30.0%" /> <img src="nje-logo.jpg" style="width:25.0%" />
+An Application of Survival Analysis
+]
+.author[
+### Marcell Granát
+]
+.institute[
+### MNB Insititute &amp; .blue[John von Neumann University]
+]
+.date[
+### 2022
+]
+
+---
+
+
+class: inverse, center, middle
+
+# You don't dare to buy a car based on your models!
+
+#### An unnamed fellow student
+
+---
+
+&lt;style type="text/css"&gt;
+.red { color: red; }
+.blue { color: #378C95; }
+strong { color: red; }
+a { color: #378C95; font-weight: bold; }
+.remark-inline-code { font-weight: 900; background-color: #a7d5e7; }
+.caption { color: #378C95; font-style: italic; text-align: center; }
+
+.content-box { 
+box-sizing: content-box;
+background-color: #378C95;
+/* Total width: 160px + (2 * 20px) + (2 * 8px) = 216px
+Total height: 80px + (2 * 20px) + (2 * 8px) = 136px
+Content box width: 160px
+Content box height: 80px */
+}
+
+.content-box-green {
+background-color: #d9edc2;
+}
+
+.content-box-red {
+background-color: #f9dbdb;
+}
+
+.fullprice {
+text-decoration: line-through;
+}
+&lt;/style&gt;
+
+
+
+
+
+
+```
+## Error in parse_block(g[-1], g[1], params.src, markdown_mode): Duplicate chunk label 'cars_visdat', which has been used for the chunk:
+## load("data/cars_data.RData")
+## names_to_select &lt;- cars_data %&gt;% 
+##   names %&gt;% 
+##   NiceName() %&gt;% 
+##   enframe() %&gt;% 
+##   arrange(- str_length(value)) %&gt;% 
+##   pull()
+## 
+## cars_data %&gt;% 
+##   sample_n(10000) %&gt;% 
+##   rename_all(NiceName) %&gt;% 
+##   select(names_to_select) %&gt;% 
+##   select(- Id) %&gt;% 
+##   rename_all(str_to_sentence) %&gt;% 
+##   rename_all(str_replace, " mot", " MOT") %&gt;% 
+##   visdat::vis_miss() +
+##   theme(
+##     plot.margin = margin(1,1.3,1,1, "cm")
+##   )
+```
+
+## Motivation (as a journal paper)
+
+- Car is one of the most expensive consumer durables on a household's bill
+
+- Presumably the most important consideration is the price-to-value ratio
+
+- Commonly sold on the used car market after use
+
+--
+
+- **How long it will take to sell?**
+
+--
+
+#### DAG
+
+&lt;img src="dag.png" width="700px" height="180px" style="display: block; margin: auto;" /&gt;
+
+---
+
+## Source of data
+
+- Daily scraped from the website [www.hasznaltauto.hu](https://www.hasznaltauto.hu)
+
+- R codes are available: [https://marcellgranat.github.io/Data-Analysis/seminar5.html]()
+
+- **All cars available** that day were collected, as well as all available information about
+the vehicles
+
+&lt;img src="hasznaltauto_list.png" width="700px" height="500px" style="display: block; margin: auto;" /&gt;
+
+---
+
+## Source of data
+
+#### Daily scrape
+
+- Platform dependent
+
+- Windows: https://www.seancarney.ca/2020/10/11/scheduling-r-scripts-to-run-automatically-in-windows/
+
+- Mac: Automator
+
+---
+
+## Source of data
+
+#### Daily scrape
+
+- Platform dependent
+
+- Windows: https://www.seancarney.ca/2020/10/11/scheduling-r-scripts-to-run-automatically-in-windows/
+
+- Mac: Automator
+
+&lt;img src="laptop.JPG" width="360px" height="270px" style="display: block; margin: auto;" /&gt;
+
+---
+
+## Source of data
+
+#### Daily scrape
+
+
+```
+## Error in calendR::calendR(start_date = "2021-05-01", end_date = "2022-02-28", : object 'download_days' not found
+```
+
+---
+
+class: inverse, center, middle
+
+# The data
+
+---
+
+## The data
+
+## Detailed information about the cars
+
+
+```r
+cars_data
+```
+
+```
+## Error in eval(expr, envir, enclos): object 'cars_data' not found
+```
+
+---
+
+## The data
+
+## Detailed information about the cars
+
+.pull-left[
+
+&lt;img src="example_car.png" width="700px" height="450px" style="display: block; margin: auto;" /&gt;
+
+]
+
+.pull-right[
+
+**General characteristics**: available for all cars
+
+**Accessories**: handled as binary (whether the car has or not)
+
+]
+
+---
+
+## The Data
+
+#### Prices
+
+.pull-left[
+
+
+
+```r
+prices_df
+```
+
+```
+## Error in eval(expr, envir, enclos): object 'prices_df' not found
+```
+]
+
+--
+
+.pull-right[
+
+##### Assumptions
+
+.content-box-red[
+**1.** If a car is available on the website one day but not the next, it has been sold at the last listed price.
+]
+
+.content-box-red[
+**2.** If a car is available on the website one day but not the next, it has been sold at the last listed price.
+]
+
+]
+
+---
+
+## The Data
+
+#### Handling missing data
+
+
+```
+## Error in NiceName(.): could not find function "NiceName"
+```
+
+```
+## Error in is_fun_list(.funs): object 'NiceName' not found
+```
+
+---
+
+## The Data
+
+#### Handling missing data
+
+- Size of the data is too large to use MICE
+
+- Imputation based on **KNN** using only the presumably relevant variables
+
+
+```r
+knn_impute &lt;- function(.data, formula, ...) {
+  outcome &lt;- gsub("~.*", "", formula) %&gt;% 
+    str_trim()
+  
+  predictors &lt;- gsub(".* ~", "", formula) %&gt;% 
+    str_split("\\+") %&gt;% 
+    reduce(c) %&gt;% 
+    str_trim()
+  
+  recipe(.data) %&gt;% 
+    step_normalize(all_numeric(), -outcome) %&gt;% 
+*   step_impute_knn(outcome, impute_with = predictors, ...) %&gt;% 
+    prep(retain = TRUE) %&gt;% 
+    juice() %&gt;% 
+    select(outcome)
+}
+```
+
+---
+
+## The Data
+
+#### Handling missing data
+
+.pull-left[
+&lt;img src="knn_wiki.svg" width="700px" height="450px" style="display: block; margin: auto;" /&gt;
+]
+
+.pull-right[
+&gt; Example of k-NN classification. The test sample (green dot) should be classified either to blue squares or to red triangles. If k = 3 (solid line circle) it is assigned to the red triangles because there are 2 triangles and only 1 square inside the inner circle. If k = 5 (dashed line circle) it is assigned to the blue squares (3 squares vs. 2 triangles inside the outer circle).
+
+Source: [Wikipedia](https://en.wikipedia.org/wiki/K-nearest_neighbors_algorithm)
+]
+
+---
+
+## The data
+
+#### Handling missing data
+
+
+```
+## Error in is_fun_list(.funs): object 'NiceName' not found
+```
+
+---
+
+## The data
+
+#### Cleaning
+
+
+```r
+szin = case_when(
+  str_detect(szin, "kék") ~ "kek", 
+  str_detect(szin, "ibolya") ~ "kek", 
+  str_detect(szin, "türkiz") ~ "kek", 
+  str_detect(szin, "piros") ~ "piros", 
+  str_detect(szin, "vörös") ~ "piros",
+  str_detect(szin, "bordó") ~ "piros",
+  str_detect(szin, "fekete") ~ "fekete",
+  str_detect(szin, "szürke") ~ "szurke",
+  str_detect(szin, "ezüst") ~ "szurke",
+  str_detect(szin, "fehér") ~ "feher",
+  str_detect(szin, "barna") ~ "barna",
+  str_detect(szin, "homok") ~ "barna",
+  str_detect(szin, "pezsgő") ~ "barna",
+  str_detect(szin, "bézs") ~ "barna",
+  str_detect(szin, "vaj") ~ "barna",
+  str_detect(szin, "zöld") ~ "zold",
+  str_detect(szin, "sárga") ~ "sarga",
+  str_detect(szin, "narancs") ~ "sarga",
+  str_detect(szin, "lila") ~ "lila",
+*     TRUE ~ "other"),
+```
+
+---
+
+## The data
+
+#### Cleaning
+
+
+```r
+filter(!is.na(kilometerora_allasa) &amp; !is.na(evjarat)) %&gt;% 
+  # evjarat ~ 1000 cars
+  filter(kilometerora_allasa &gt; 0)
+```
+
+---
+
+## The data
+
+#### Cleaning
+
+
+```r
+price_change_df &lt;- prices_df %&gt;% 
+  group_by(id) %&gt;% 
+  summarise(
+    min_price = min(price, na.rm = TRUE),
+    max_price = max(price, na.rm = TRUE),
+*   price_change = max_price / min_price
+  )
+
+combined_df %&gt;% 
+  anti_join(
+    price_change_df %&gt;% 
+*     filter(price_change &gt; 5) %&gt;% 
+      # unrealistic jump in price ~ 100 cars
+      select(id)
+  ) %&gt;% 
+* filter(price &lt;= 3e7 &amp; price &gt;= 3e5 &amp; !is.na(fct_1)) %&gt;%  
+  # unrealistic prices ~ 15 000 cars
+  na.omit()
+```
+
+---
+
+## The data
+
+#### Dimension reduction
+
+- Handling the "accesories" type data as binary resulted 235 dummy variables.
+
+- Some of the models we applied in this study use one-hot coding (470 0/1 columns) 😱
+
+
+
+--
+
+- Appropriate methodology for binary data: **MCA**
+
+---
+
+## The data
+
+#### Dimension reduction
+
+
+```r
+training_df &lt;- factor_df %&gt;% 
+  group_by_at(setdiff(names(additional_factor_df), "id")) %&gt;%
+  sample_frac(., size=.05) %&gt;%
+  ungroup() %&gt;%
+  na.omit() %&gt;% 
+  select(where(~ n_distinct(.) &gt; 1), -id) %&gt;% 
+  mutate_all(as.character) %&gt;% 
+  mutate_all(as.factor)
+
+n_factor &lt;- training_df %&gt;% 
+  FactoMineR::MCA(graph = FALSE) %&gt;% 
+  # can calculate n_factor only from {FactoMineR}
+  factoextra::get_eigenvalue() %&gt;% 
+  data.frame() %&gt;% 
+* filter(eigenvalue &gt; mean(eigenvalue)) %&gt;% 
+  nrow()
+
+fit_mca &lt;- training_df %&gt;% 
+* MASS::mca(nf = n_factor) # can predict only w {MASS}
+```
+
+---
+
+## The data
+
+#### Dimension reduction
+
+
+```r
+mca_factor_df &lt;- factor_df %&gt;% 
+  select(names(training_df)) %&gt;% 
+  mutate_all(as.character) %&gt;% 
+  mutate_all(as.factor) %&gt;% 
+  group_by(cut(row_number(), 100)) %&gt;% 
+  # split the df to 100 pieces to avoid memory overload
+  group_map(~.) %&gt;% 
+* map(~ data.frame(predict(object = fit_mca, newdata = .)))
+```
+
+--
+
+The outcome: **236** numeric variables
+
+---
+
+class: middle, center
+
+### The mainsteps of the study
+
+![](mainsteps.png)
+
+---
+
+## Determining the market price
+
+--
+
+- Value of each vehicle is different
+
+--
+
+- Focus of this study is not exploring the causal effects that influence the sale price, but the **accuracy** of the estimate
+
+--
+
+- Testing several ML methods in a **stratified k-fold cross-validation** (9,000/1,000; before July) framework
+
+--
+
+- Comparing models with the best hyperparamter set on a testing set (10,000; before July)
+
+
+```
+## Error in UseMethod("filter"): no applicable method for 'filter' applied to an object of class "function"
+```
+
+
+```r
+training_df %&gt;% 
+  sample_n(1e4) %&gt;% 
+  vfold_cv(strata = price, v = 10)
+```
+
+---
+
+## Determining the market price
+
+#### Descriptive statistics of offer prices in HUF
+
+
+```
+## Error in UseMethod("mutate"): no applicable method for 'mutate' applied to an object of class "function"
+```
+
+*Only the cars used in the modeling were taken into account in the calculation, excluding outliers.*
+
+---
+
+## Determining the market price
+
+
+&lt;img src="recipes.png" width="300px" height="300px" style="display: block; margin: auto;" /&gt;
+
+
+```r
+recipe(price ~ ., data = training_df) %&gt;% 
+* step_log(all_outcomes()) %&gt;% 
+  step_rm(id, date) %&gt;% 
+* step_normalize(all_numeric())
+```
+
+---
+
+## Determining the market price
+
+#### Number of hyperparameters, combination of tested parameters, and total runtime of hyperparameter tuning
+
+
+```
+## Error in unnest(.): object 'base_tune' not found
+```
+
+---
+
+## Determining the market price
+
+#### Stratified k-fold cross-validation R-squared by **OLS**
+
+
+```
+## Error in unnest(., .metrics): object 'base_tune' not found
+```
+
+---
+
+## Determining the market price
+
+
+```
+## Error in autoplot(base_tune$tune[[1]], metric = "rsq"): object 'base_tune' not found
+```
+
+---
+
+## Determining the market price
+
+
+```
+## Error in autoplot(base_tune$tune[[3]], metric = "rsq"): object 'base_tune' not found
+```
+
+---
+
+## Determining the market price
+
+
+```
+## Error in autoplot(base_tune$tune[[4]], metric = "rsq"): object 'base_tune' not found
+```
+
+---
+
+## Determining the market price
+
+
+```
+## Error in autoplot(base_tune$tune[[5]], metric = "rsq"): object 'base_tune' not found
+```
+
+---
+
+## Determining the market price
+
+
+```
+## Error in autoplot(base_tune$tune[[6]], metric = "rsq"): object 'base_tune' not found
+```
+
+---
+
+## Determining the market price
+
+
+```
+## Error in autoplot(base_tune$tune[[7]], metric = "rsq"): object 'base_tune' not found
+```
+
+---
+
+## Determining the market price
+
+#### Comparing the estimation accuracy of the investigated models
+
+
+```
+## Error in list2(...): object 'testing_tune' not found
+```
+
+---
+
+## Determining the market price
+
+#### Descriptive statistics of the estimated price-to-value
+
+
+```
+## Error in mutate(., qb = lubridate::floor_date(date_end, "quarter"), qe = lubridate::ceiling_date(date_end, : object 'surv_raw_df' not found
+```
+
+*Price-to-value is defined as the proportion of offer price and the predicted price from XGBoost. To report in this table we subtracted 1 from the values.*
+
+---
+
+class: inverse, middle, center
+
+# Survival Analysis
+
+---
+
+## Survival Analysis
+
+#### Survival curve showing the probability of not having disappeared from the supply
+
+
+```
+## Error in mutate(., qb = lubridate::floor_date(date_start, "quarter"), : object 'duration_df' not found
+```
+
+```
+## Error in survfit(formula = Surv(duration, sold) ~ 1, data = km_df): could not find function "survfit"
+```
+
+```
+## Error in ggsurvplot(km_all, risk.table = FALSE, conf.int = TRUE, xlim = c(0, : could not find function "ggsurvplot"
+```
+
+---
+
+## Survival Analysis
+
+Survival function:
+`$$G(t) = P(T \ge t)$$`
+The hazard rate (h) (intensity process:
+`$$h(t)=\lim _{\Delta \searrow 0} \frac{\mathbb{P}(T&lt;t+\Delta \mid T \geq t)}{\Delta}=\frac{f(t)}{G(t)}$$`
+Proportional effect on the intensity process:
+`$$h_{i}(t)=c_{i} h_{0}(t),$$`
+Regression:
+
+`$$\ln c_{i}=\sum_{j=1}^{p} \beta_{j} x_{i j},$$`
+
+where `\(i\)` refers to individual cars and `\(j\)` refers to explanatory variables.
+
+---
+
+## Survival analysis
+
+- Fitting a model with 250 explanatory variables would be inappropriate for interpretation
+
+--
+
+`$$\text{LASSO}=\text{GLM} + \lambda \sum_{j=1}^p{|\beta_j|}$$`
+
+--
+
+- The lambda that leads to the model having the lowest number of explanatory variables with **adequate accuracy** (within 1 standard error of the best model) is used for feature selection
+
+--
+
+    - **Harell C index**: proportion of concordant pairs in the total concordant and discordant (when the car estimated with the higher intensity is sold later) pairs
+
+---
+
+## Survival analysis
+
+- Fitting a model with 250 explanatory variables would be inappropriate for interpretation
+
+`$$\text{LASSO}=\text{GLM} + \lambda \sum_{j=1}^p{|\beta_j|}$$`
+
+
+- The lambda that leads to the model having the lowest number of explanatory variables with **adequate accuracy** (within 1 standard error of the best model) is used for feature selection
+
+    - **Harell C index**: proportion of concordant pairs in the total concordant and discordant (when the car estimated with the higher intensity is sold later) pairs
+   
+
+- LASSO-based model introduces bias by shrinking the coefficients of all variables towards zero, and does not provide information on the significance of the variable
+
+--
+
+    - Thus an unregularized with the selected variables is used for interpretation
+
+---
+
+## Survival analysis
+
+#### K-fold cross-validation for finding the optimal lambda hyperparameter
+
+
+```
+## Error in plot(cvfit): object 'cvfit' not found
+```
+
+---
+
+## Survival analysis
+
+#### Estimated coefficients of the Cox models
+
+
+```
+## Error in tidy(fit_cox, conf.int = T): could not find function "tidy"
+```
+
+---
+
+## Survival analysis
+
+#### Estimated coefficients of the Cox models
+
+
+```
+## Error in tidy(fit_cox, conf.int = T): could not find function "tidy"
+```
+
+---
+
+## Survival analysis
+
+#### Survival model's response to the change of price-to-value
+
+
+```
+## Error in predict_quantile_prob(., .fit = fit_cox, seq(from = 0.1, to = 0.9, : could not find function "predict_quantile_prob"
+```
+
+*To capture the partial effect of price-to-value assuming that all other variables are unchanged, numeric predictors are fixed at their medians, while categorical and logical variables are fixed at their modes. The monotone increasing red line means that if the price-to-value is lower (the ratio of the offer price to the predicted price is higher), then the median selling time is higher.*
+
+---
+
+## Survival analysis
+
+#### Example with a valid car
+
+![](app_example.png)
+
+---
+
+class: center, middle
+
+# Thank you for your attention!
+
+Slides are available at [www.marcellgranat.com](https://www.marcellgranat.com)
+
+---
+
+# References
+
+&lt;p&gt;&lt;cite&gt;Hungarian Central Statistical Office
+(2020).
+&lt;em&gt;Statistical Yearbook of Hungary, 2019&lt;/em&gt;.
+Budapest: Hungarian Central Statistical Office.&lt;/cite&gt;&lt;/p&gt;
+&lt;p&gt;&lt;cite&gt;Hungarian Central Statistical Office
+(2022).
+&lt;em&gt;Consumer Price Indices by COICOP classification&lt;/em&gt;.
+Accessed on 03.04.2022.
+URL: &lt;a href="https://www.ksh.hu/stadat_files/ara/en/ara0005.html"&gt;https://www.ksh.hu/stadat_files/ara/en/ara0005.html&lt;/a&gt;.&lt;/cite&gt;&lt;/p&gt;
+&lt;p&gt;&lt;cite&gt;Liao, S., Y. Lin, Y. Lin, et al.
+(2014).
+&amp;ldquo;Missing value imputation in high-dimensional phenomic data: imputable or not, and how?&amp;rdquo;
+In: &lt;em&gt;BMC Bioinformatics&lt;/em&gt; 15.1, pp. 346&amp;ndash;346.
+DOI: &lt;a href="https://doi.org/10.1186/s12859-014-0346-6"&gt;10.1186/s12859-014-0346-6&lt;/a&gt;.&lt;/cite&gt;&lt;/p&gt;
+&lt;p&gt;&lt;cite&gt;Sharma, N. and K. Saroha
+(2015).
+&amp;ldquo;Study of dimension reduction methodologies in data mining&amp;rdquo;.
+In: 
+&lt;em&gt;International Conference on Computing, Communication &amp;amp; Automation&lt;/em&gt;.
+Greater Noida, India: IEEE, pp. 133&amp;ndash;137.
+ISBN: 978-1-4799-8890-7.
+DOI: &lt;a href="https://doi.org/10.1109/CCAA.2015.7148359"&gt;10.1109/CCAA.2015.7148359&lt;/a&gt;.
+URL: &lt;a href="http://ieeexplore.ieee.org/document/7148359/"&gt;http://ieeexplore.ieee.org/document/7148359/&lt;/a&gt; (visited on Apr. 07, 2022).&lt;/cite&gt;&lt;/p&gt;
+
+---
+# References  2
+&lt;p&gt;&lt;cite&gt;Abdi, H. and D. Valentin
+(2007).
+&amp;ldquo;Multiple correspondence analysis&amp;rdquo;.
+In: &lt;em&gt;Encyclopedia of measurement and statistics&lt;/em&gt; 2.4, pp. 651&amp;ndash;657.&lt;/cite&gt;&lt;/p&gt;
+&lt;p&gt;&lt;cite&gt;Venables, W. N. and B. D. Ripley
+(2013).
+&lt;em&gt;Modern applied statistics with S-PLUS&lt;/em&gt;.
+Berlin: Springer Science &amp;amp; Business Media.&lt;/cite&gt;&lt;/p&gt;
+&lt;p&gt;&lt;cite&gt;Kaiser, H. F.
+(1960).
+&amp;ldquo;The application of electronic computers to factor analysis&amp;rdquo;.
+In: &lt;em&gt;Educational and Psychological Measurement&lt;/em&gt; 20.1, pp. 141&amp;ndash;151.&lt;/cite&gt;&lt;/p&gt;
+&lt;p&gt;&lt;cite&gt;Kuhn, M. and K. Johnson
+(2013).
+&amp;ldquo;Over-fitting and model tuning&amp;rdquo;.
+In: 
+&lt;em&gt;Applied predictive modeling&lt;/em&gt;.
+Berlin: Springer, pp. 61&amp;ndash;92.&lt;/cite&gt;&lt;/p&gt;
+&lt;p&gt;&lt;cite&gt;Cox, D. R.
+(1972).
+&amp;ldquo;Regression models and life-tables&amp;rdquo;.
+In: &lt;em&gt;Journal of the Royal Statistical Society: Series B (Methodological)&lt;/em&gt; 34.2, pp. 187&amp;ndash;202.&lt;/cite&gt;&lt;/p&gt;
+
+---
+# References  3
+&lt;p&gt;&lt;cite&gt;Kaplan, E. L. and P. Meier
+(1958).
+&amp;ldquo;Nonparametric estimation from incomplete observations&amp;rdquo;.
+In: &lt;em&gt;Journal of the American Statistical Association&lt;/em&gt; 53.282, pp. 457&amp;ndash;481.&lt;/cite&gt;&lt;/p&gt;
+&lt;p&gt;&lt;cite&gt;Nguyen-Sy, T., J. Wakim, Q. To, et al.
+(2020).
+&amp;ldquo;Predicting the compressive strength of concrete from its compositions and age using the extreme gradient boosting method&amp;rdquo;.
+In: &lt;em&gt;Construction and Building Materials&lt;/em&gt; 260, p. 119757.&lt;/cite&gt;&lt;/p&gt;
+&lt;p&gt;&lt;cite&gt;Sheridan, R. P., W. M. Wang, A. Liaw, et al.
+(2016).
+&amp;ldquo;Extreme gradient boosting as a method for quantitative structure&amp;ndash;activity relationships&amp;rdquo;.
+In: &lt;em&gt;Journal of Chemical Information and Modeling&lt;/em&gt; 56.12, pp. 2353&amp;ndash;2360.&lt;/cite&gt;&lt;/p&gt;
+&lt;p&gt;&lt;cite&gt;Simon, N., J. Friedman, T. Hastie, et al.
+(2011).
+&amp;ldquo;Regularization Paths for Cox's Proportional Hazards Model via Coordinate Descent&amp;rdquo;.
+In: &lt;em&gt;Journal of Statistical Software&lt;/em&gt; 39.5, pp. 1&amp;ndash;13.
+URL: &lt;a href="https://www.jstatsoft.org/v39/i05/"&gt;https://www.jstatsoft.org/v39/i05/&lt;/a&gt;.&lt;/cite&gt;&lt;/p&gt;
+&lt;p&gt;&lt;cite&gt;Goel, M. K., P. Khanna, and J. Kishore
+(2010).
+&amp;ldquo;Understanding survival analysis: Kaplan-Meier estimate&amp;rdquo;.
+In: &lt;em&gt;International journal of Ayurveda research&lt;/em&gt; 1.4, p. 274.&lt;/cite&gt;&lt;/p&gt;
+
+---
+# References  4
+&lt;p&gt;&lt;cite&gt;Grambsch, P. M. and T. M. Therneau
+(1994).
+&amp;ldquo;Proportional hazards tests and diagnostics based on weighted residuals&amp;rdquo;.
+In: &lt;em&gt;Biometrika&lt;/em&gt; 81.3, pp. 515&amp;ndash;526.&lt;/cite&gt;&lt;/p&gt;
+&lt;p&gt;&lt;cite&gt;Schmid, M., M. N. Wright, and A. Ziegler
+(2016).
+&amp;ldquo;On the use of Harrell’s C for clinical risk prediction via random survival forests&amp;rdquo;.
+In: &lt;em&gt;Expert Systems with Applications&lt;/em&gt; 63, pp. 450&amp;ndash;459.&lt;/cite&gt;&lt;/p&gt;
+&lt;p&gt;&lt;cite&gt;Gareth, J., W. Daniela, H. Trevor, et al.
+(2013).
+&lt;em&gt;An introduction to statistical learning: with applications in R&lt;/em&gt;.
+Berlin: Spinger.&lt;/cite&gt;&lt;/p&gt;
+&lt;p&gt;&lt;cite&gt;Zhang, Z., J. Reinikainen, K. A. Adeleke, et al.
+(2018).
+&amp;ldquo;Time-varying covariates and coefficients in Cox regression models&amp;rdquo;.
+In: &lt;em&gt;Annals of Translational Medicine&lt;/em&gt; 6.7.&lt;/cite&gt;&lt;/p&gt;
+&lt;p&gt;&lt;cite&gt;Fisher, L. D. and in, Danyu Y
+(1999).
+&amp;ldquo;Time-dependent covariates in the Cox proportional-hazards regression model&amp;rdquo;.
+In: &lt;em&gt;Annual Review of Public Health&lt;/em&gt; 20.1, pp. 145&amp;ndash;157.&lt;/cite&gt;&lt;/p&gt;
+
+---
+# References  5
+&lt;p&gt;&lt;cite&gt;Pangallo, M. and M. Loberto
+(2018).
+&amp;ldquo;Home is where the ad is: online interest proxies housing demand&amp;rdquo;.
+In: &lt;em&gt;EPJ Data science&lt;/em&gt; 7.1, p. 47.&lt;/cite&gt;&lt;/p&gt;
+&lt;p&gt;&lt;cite&gt;Jahani, E., P. Sundsøy, J. Bjelland, et al.
+(2017).
+&amp;ldquo;Improving official statistics in emerging markets using machine learning and mobile phone data&amp;rdquo;.
+In: &lt;em&gt;EPJ Data Science&lt;/em&gt; 6.1, p. 3.&lt;/cite&gt;&lt;/p&gt;
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+"highlightStyle": "github",
+"highlightLines": true,
+"countIncrementalSlides": false
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();
+// add `data-at-shortcutkeys` attribute to <body> to resolve conflicts with JAWS
+// screen reader (see PR #262)
+(function(d) {
+  let res = {};
+  d.querySelectorAll('.remark-help-content table tr').forEach(tr => {
+    const t = tr.querySelector('td:nth-child(2)').innerText;
+    tr.querySelectorAll('td:first-child .key').forEach(key => {
+      const k = key.innerText;
+      if (/^[a-z]$/.test(k)) res[k] = t;  // must be a single letter (key)
+    });
+  });
+  d.body.setAttribute('data-at-shortcutkeys', JSON.stringify(res));
+})(document);
+(function() {
+  "use strict"
+  // Replace <script> tags in slides area to make them executable
+  var scripts = document.querySelectorAll(
+    '.remark-slides-area .remark-slide-container script'
+  );
+  if (!scripts.length) return;
+  for (var i = 0; i < scripts.length; i++) {
+    var s = document.createElement('script');
+    var code = document.createTextNode(scripts[i].textContent);
+    s.appendChild(code);
+    var scriptAttrs = scripts[i].attributes;
+    for (var j = 0; j < scriptAttrs.length; j++) {
+      s.setAttribute(scriptAttrs[j].name, scriptAttrs[j].value);
+    }
+    scripts[i].parentElement.replaceChild(s, scripts[i]);
+  }
+})();
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+// adds .remark-code-has-line-highlighted class to <pre> parent elements
+// of code chunks containing highlighted lines with class .remark-code-line-highlighted
+(function(d) {
+  const hlines = d.querySelectorAll('.remark-code-line-highlighted');
+  const preParents = [];
+  const findPreParent = function(line, p = 0) {
+    if (p > 1) return null; // traverse up no further than grandparent
+    const el = line.parentElement;
+    return el.tagName === "PRE" ? el : findPreParent(el, ++p);
+  };
+
+  for (let line of hlines) {
+    let pre = findPreParent(line);
+    if (pre && !preParents.includes(pre)) preParents.push(pre);
+  }
+  preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
+})(document);</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>
