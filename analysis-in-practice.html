@@ -80,28 +80,6 @@ text-decoration: line-through;
 
 
 
-```
-## Error in parse_block(g[-1], g[1], params.src, markdown_mode): Duplicate chunk label 'cars_visdat', which has been used for the chunk:
-## load("data/cars_data.RData")
-## names_to_select &lt;- cars_data %&gt;% 
-##   names %&gt;% 
-##   NiceName() %&gt;% 
-##   enframe() %&gt;% 
-##   arrange(- str_length(value)) %&gt;% 
-##   pull()
-## 
-## cars_data %&gt;% 
-##   sample_n(10000) %&gt;% 
-##   rename_all(NiceName) %&gt;% 
-##   select(names_to_select) %&gt;% 
-##   select(- Id) %&gt;% 
-##   rename_all(str_to_sentence) %&gt;% 
-##   rename_all(str_replace, " mot", " MOT") %&gt;% 
-##   visdat::vis_miss() +
-##   theme(
-##     plot.margin = margin(1,1.3,1,1, "cm")
-##   )
-```
 
 ## Motivation (as a journal paper)
 
@@ -166,10 +144,7 @@ the vehicles
 
 #### Daily scrape
 
-
-```
-## Error in calendR::calendR(start_date = "2021-05-01", end_date = "2022-02-28", : object 'download_days' not found
-```
+&lt;embed src="figures/unnamed-chunk-7-1.pdf" width="700px" height="450px" style="display: block; margin: auto;" type="application/pdf" /&gt;
 
 ---
 
@@ -184,12 +159,27 @@ class: inverse, center, middle
 ## Detailed information about the cars
 
 
-```r
-cars_data
 ```
-
-```
-## Error in eval(expr, envir, enclos): object 'cars_data' not found
+## # A tibble: 613,614 × 24
+##    id       brand   evjarat allapot kivitel    kilometerora_al… szallithato_sze…
+##    &lt;chr&gt;    &lt;fct&gt;     &lt;int&gt; &lt;fct&gt;   &lt;fct&gt;                 &lt;int&gt;            &lt;int&gt;
+##  1 15650800 bmw        2019 Újszerű Sedan                     5                5
+##  2 15988457 peugeot    2020 Kitűnő  Ferdehátú              5000                5
+##  3 16062262 peugeot    2020 Kitűnő  Városi te…                1                5
+##  4 16635025 opel       2021 Kitűnő  Városi te…                2                5
+##  5 16636084 opel       2021 Kitűnő  Városi te…                3                5
+##  6 16696088 opel       2021 Kitűnő  Kombi                     5                9
+##  7 16742853 peugeot    2021 Kitűnő  Városi te…                4                5
+##  8 16776038 opel       2021 Kitűnő  Egyterű                   2                7
+##  9 16814133 peugeot    2021 Kitűnő  Egyterű                   4                7
+## 10 16844090 suzuki     2021 Normál  Városi te…                1                5
+## # … with 613,604 more rows, and 17 more variables: ajtok_szama &lt;fct&gt;,
+## #   klima_fajtaja &lt;fct&gt;, uzemanyag &lt;fct&gt;, hengerurtartalom &lt;int&gt;,
+## #   teljesitmeny &lt;int&gt;, henger_elrendezes &lt;fct&gt;, hajtas &lt;fct&gt;,
+## #   sebessegvalto_fajtaja &lt;fct&gt;, muszaki_vizsga_ervenyes &lt;ord&gt;,
+## #   nyari_gumi_meret &lt;int&gt;, szin &lt;fct&gt;, sajat_tomeg &lt;int&gt;, teljes_tomeg &lt;int&gt;,
+## #   csomagtarto &lt;int&gt;, nyari_gumi_meret2 &lt;int&gt;, nyari_gumi_meret3 &lt;int&gt;,
+## #   sebessegvalto_fokozatszam &lt;int&gt;
 ```
 
 ---
@@ -222,12 +212,21 @@ cars_data
 
 
 
-```r
-prices_df
 ```
-
-```
-## Error in eval(expr, envir, enclos): object 'prices_df' not found
+## # A tibble: 12,409,519 × 3
+##    id          price date      
+##    &lt;chr&gt;       &lt;dbl&gt; &lt;date&gt;    
+##  1 15650800 14970000 2021-05-22
+##  2 15650800 14970000 2021-05-22
+##  3 15988457 10800000 2021-05-22
+##  4 15988457 10800000 2021-05-22
+##  5 16062262  8299000 2021-05-22
+##  6 16062262  8299000 2021-05-22
+##  7 16635025  5299000 2021-05-22
+##  8 16635025  5299000 2021-05-22
+##  9 16636084  7789000 2021-05-22
+## 10 16636084  7789000 2021-05-22
+## # … with 12,409,509 more rows
 ```
 ]
 
@@ -253,14 +252,7 @@ prices_df
 
 #### Handling missing data
 
-
-```
-## Error in NiceName(.): could not find function "NiceName"
-```
-
-```
-## Error in is_fun_list(.funs): object 'NiceName' not found
-```
+&lt;img src="figures/cars_visdat-1.png" width="700px" height="450px" style="display: block; margin: auto;" /&gt;
 
 ---
 
@@ -273,24 +265,6 @@ prices_df
 - Imputation based on **KNN** using only the presumably relevant variables
 
 
-```r
-knn_impute &lt;- function(.data, formula, ...) {
-  outcome &lt;- gsub("~.*", "", formula) %&gt;% 
-    str_trim()
-  
-  predictors &lt;- gsub(".* ~", "", formula) %&gt;% 
-    str_split("\\+") %&gt;% 
-    reduce(c) %&gt;% 
-    str_trim()
-  
-  recipe(.data) %&gt;% 
-    step_normalize(all_numeric(), -outcome) %&gt;% 
-*   step_impute_knn(outcome, impute_with = predictors, ...) %&gt;% 
-    prep(retain = TRUE) %&gt;% 
-    juice() %&gt;% 
-    select(outcome)
-}
-```
 
 ---
 
@@ -315,9 +289,20 @@ Source: [Wikipedia](https://en.wikipedia.org/wiki/K-nearest_neighbors_algorithm)
 #### Handling missing data
 
 
-```
-## Error in is_fun_list(.funs): object 'NiceName' not found
-```
+|Imputed variable              |Predictors                                                                                     |
+|:-----------------------------|:----------------------------------------------------------------------------------------------|
+|Cylinder capacity             |Brand, year of manufacture, number of persons transported                                      |
+|Cylinder layout               |Brand, year of manufacture, cylinder capacity, engine performance                              |
+|Number of doors               |Brand, year of manufacture, own weight, number of persons transported                          |
+|Number of persons transported |Brand, year of manufacture, own weight                                                         |
+|Own weight                    |Brand, year of manufacture, engine performance, number of persons transported, number of doors |
+|Tire size 1                   |Brand, year of manufacture, own weight                                                         |
+|Tire size 2                   |Brand, year of manufacture, own weight                                                         |
+|Tire size 3                   |Brand, year of manufacture, own weight                                                         |
+|Total weight                  |Brand, year of manufacture, engine performance, number of persons transported, number of doors |
+|Trunk                         |Brand, year of manufacture, number of persons transported, own weight, total weight            |
+|Type of fuel                  |Brand, year of manufacture, engine performance, cylinder capacity                              |
+|Wheel drive                   |Brand, year of manufacture, engine performance, type of fuel                                   |
 
 ---
 
@@ -326,29 +311,6 @@ Source: [Wikipedia](https://en.wikipedia.org/wiki/K-nearest_neighbors_algorithm)
 #### Cleaning
 
 
-```r
-szin = case_when(
-  str_detect(szin, "kék") ~ "kek", 
-  str_detect(szin, "ibolya") ~ "kek", 
-  str_detect(szin, "türkiz") ~ "kek", 
-  str_detect(szin, "piros") ~ "piros", 
-  str_detect(szin, "vörös") ~ "piros",
-  str_detect(szin, "bordó") ~ "piros",
-  str_detect(szin, "fekete") ~ "fekete",
-  str_detect(szin, "szürke") ~ "szurke",
-  str_detect(szin, "ezüst") ~ "szurke",
-  str_detect(szin, "fehér") ~ "feher",
-  str_detect(szin, "barna") ~ "barna",
-  str_detect(szin, "homok") ~ "barna",
-  str_detect(szin, "pezsgő") ~ "barna",
-  str_detect(szin, "bézs") ~ "barna",
-  str_detect(szin, "vaj") ~ "barna",
-  str_detect(szin, "zöld") ~ "zold",
-  str_detect(szin, "sárga") ~ "sarga",
-  str_detect(szin, "narancs") ~ "sarga",
-  str_detect(szin, "lila") ~ "lila",
-*     TRUE ~ "other"),
-```
 
 ---
 
@@ -357,11 +319,6 @@ szin = case_when(
 #### Cleaning
 
 
-```r
-filter(!is.na(kilometerora_allasa) &amp; !is.na(evjarat)) %&gt;% 
-  # evjarat ~ 1000 cars
-  filter(kilometerora_allasa &gt; 0)
-```
 
 ---
 
@@ -370,26 +327,6 @@ filter(!is.na(kilometerora_allasa) &amp; !is.na(evjarat)) %&gt;%
 #### Cleaning
 
 
-```r
-price_change_df &lt;- prices_df %&gt;% 
-  group_by(id) %&gt;% 
-  summarise(
-    min_price = min(price, na.rm = TRUE),
-    max_price = max(price, na.rm = TRUE),
-*   price_change = max_price / min_price
-  )
-
-combined_df %&gt;% 
-  anti_join(
-    price_change_df %&gt;% 
-*     filter(price_change &gt; 5) %&gt;% 
-      # unrealistic jump in price ~ 100 cars
-      select(id)
-  ) %&gt;% 
-* filter(price &lt;= 3e7 &amp; price &gt;= 3e5 &amp; !is.na(fct_1)) %&gt;%  
-  # unrealistic prices ~ 15 000 cars
-  na.omit()
-```
 
 ---
 
@@ -414,27 +351,6 @@ combined_df %&gt;%
 #### Dimension reduction
 
 
-```r
-training_df &lt;- factor_df %&gt;% 
-  group_by_at(setdiff(names(additional_factor_df), "id")) %&gt;%
-  sample_frac(., size=.05) %&gt;%
-  ungroup() %&gt;%
-  na.omit() %&gt;% 
-  select(where(~ n_distinct(.) &gt; 1), -id) %&gt;% 
-  mutate_all(as.character) %&gt;% 
-  mutate_all(as.factor)
-
-n_factor &lt;- training_df %&gt;% 
-  FactoMineR::MCA(graph = FALSE) %&gt;% 
-  # can calculate n_factor only from {FactoMineR}
-  factoextra::get_eigenvalue() %&gt;% 
-  data.frame() %&gt;% 
-* filter(eigenvalue &gt; mean(eigenvalue)) %&gt;% 
-  nrow()
-
-fit_mca &lt;- training_df %&gt;% 
-* MASS::mca(nf = n_factor) # can predict only w {MASS}
-```
 
 ---
 
@@ -443,16 +359,6 @@ fit_mca &lt;- training_df %&gt;%
 #### Dimension reduction
 
 
-```r
-mca_factor_df &lt;- factor_df %&gt;% 
-  select(names(training_df)) %&gt;% 
-  mutate_all(as.character) %&gt;% 
-  mutate_all(as.factor) %&gt;% 
-  group_by(cut(row_number(), 100)) %&gt;% 
-  # split the df to 100 pieces to avoid memory overload
-  group_map(~.) %&gt;% 
-* map(~ data.frame(predict(object = fit_mca, newdata = .)))
-```
 
 --
 
@@ -487,16 +393,8 @@ class: middle, center
 - Comparing models with the best hyperparamter set on a testing set (10,000; before July)
 
 
-```
-## Error in UseMethod("filter"): no applicable method for 'filter' applied to an object of class "function"
-```
 
 
-```r
-training_df %&gt;% 
-  sample_n(1e4) %&gt;% 
-  vfold_cv(strata = price, v = 10)
-```
 
 ---
 
@@ -505,9 +403,13 @@ training_df %&gt;%
 #### Descriptive statistics of offer prices in HUF
 
 
-```
-## Error in UseMethod("mutate"): no applicable method for 'mutate' applied to an object of class "function"
-```
+|Quarter         |   Mean    |  Median   | Standard deviation | Skeness  | Kurtosis |
+|:---------------|:---------:|:---------:|:------------------:|:--------:|:--------:|
+|2021/04-2021/07 | 3,710,100 | 1,949,000 |     4,821,653      | 2.795249 | 11.63271 |
+|2021/07-2021/10 | 3,774,025 | 1,950,000 |     4,883,133      | 2.731550 | 11.19031 |
+|2021/10-2022/01 | 3,904,783 | 1,990,000 |     5,057,759      | 2.626280 | 10.32879 |
+|2022/01-2022/04 | 4,068,776 | 2,200,000 |     4,873,486      | 2.524668 | 10.10797 |
+|Total           | 3,871,298 | 1,999,000 |     4,931,980      | 2.659425 | 10.71338 |
 
 *Only the cars used in the modeling were taken into account in the calculation, excluding outliers.*
 
@@ -519,12 +421,6 @@ training_df %&gt;%
 &lt;img src="recipes.png" width="300px" height="300px" style="display: block; margin: auto;" /&gt;
 
 
-```r
-recipe(price ~ ., data = training_df) %&gt;% 
-* step_log(all_outcomes()) %&gt;% 
-  step_rm(id, date) %&gt;% 
-* step_normalize(all_numeric())
-```
 
 ---
 
@@ -533,9 +429,15 @@ recipe(price ~ ., data = training_df) %&gt;%
 #### Number of hyperparameters, combination of tested parameters, and total runtime of hyperparameter tuning
 
 
-```
-## Error in unnest(.): object 'base_tune' not found
-```
+|Model                              | # of hyperparameters | # of parameter combinations | Runtime (seconds) |
+|:----------------------------------|:--------------------:|:---------------------------:|:-----------------:|
+|EXtreme Gradient Boosting Training |          7           |             128             |      66,280       |
+|Ordinary Least Squares             |          0           |              1              |         4         |
+|Single-hidden-layer neural network |          3           |             46              |      37,353       |
+|K-Nearest Neighbor                 |          3           |             32              |      213,280      |
+|Random Forest                      |          2           |             32              |      60,923       |
+|Linear support vector machines     |          3           |             128             |      184,857      |
+|Regression tree                    |          3           |             64              |        814        |
 
 ---
 
@@ -544,63 +446,54 @@ recipe(price ~ ., data = training_df) %&gt;%
 #### Stratified k-fold cross-validation R-squared by **OLS**
 
 
-```
-## Error in unnest(., .metrics): object 'base_tune' not found
-```
+|  fold  |    rsq    |
+|:------:|:---------:|
+| Fold01 | 0.9179197 |
+| Fold02 | 0.9066590 |
+| Fold03 | 0.9118202 |
+| Fold04 | 0.9032560 |
+| Fold05 | 0.8824825 |
+| Fold06 | 0.8839070 |
+| Fold07 | 0.9053443 |
+| Fold08 | 0.9062825 |
+| Fold09 | 0.9170148 |
+| Fold10 | 0.9120721 |
 
 ---
 
 ## Determining the market price
 
-
-```
-## Error in autoplot(base_tune$tune[[1]], metric = "rsq"): object 'base_tune' not found
-```
+&lt;embed src="figures/unnamed-chunk-26-1.pdf" width="700px" height="450px" style="display: block; margin: auto;" type="application/pdf" /&gt;
 
 ---
 
 ## Determining the market price
 
-
-```
-## Error in autoplot(base_tune$tune[[3]], metric = "rsq"): object 'base_tune' not found
-```
+&lt;embed src="figures/unnamed-chunk-27-1.pdf" width="700px" height="450px" style="display: block; margin: auto;" type="application/pdf" /&gt;
 
 ---
 
 ## Determining the market price
 
-
-```
-## Error in autoplot(base_tune$tune[[4]], metric = "rsq"): object 'base_tune' not found
-```
+&lt;embed src="figures/unnamed-chunk-28-1.pdf" width="700px" height="450px" style="display: block; margin: auto;" type="application/pdf" /&gt;
 
 ---
 
 ## Determining the market price
 
-
-```
-## Error in autoplot(base_tune$tune[[5]], metric = "rsq"): object 'base_tune' not found
-```
+&lt;embed src="figures/unnamed-chunk-29-1.pdf" width="700px" height="450px" style="display: block; margin: auto;" type="application/pdf" /&gt;
 
 ---
 
 ## Determining the market price
 
-
-```
-## Error in autoplot(base_tune$tune[[6]], metric = "rsq"): object 'base_tune' not found
-```
+&lt;embed src="figures/unnamed-chunk-30-1.pdf" width="700px" height="450px" style="display: block; margin: auto;" type="application/pdf" /&gt;
 
 ---
 
 ## Determining the market price
 
-
-```
-## Error in autoplot(base_tune$tune[[7]], metric = "rsq"): object 'base_tune' not found
-```
+&lt;embed src="figures/unnamed-chunk-31-1.pdf" width="700px" height="450px" style="display: block; margin: auto;" type="application/pdf" /&gt;
 
 ---
 
@@ -608,10 +501,7 @@ recipe(price ~ ., data = training_df) %&gt;%
 
 #### Comparing the estimation accuracy of the investigated models
 
-
-```
-## Error in list2(...): object 'testing_tune' not found
-```
+&lt;embed src="figures/unnamed-chunk-32-1.pdf" width="700px" height="450px" style="display: block; margin: auto;" type="application/pdf" /&gt;
 
 ---
 
@@ -620,9 +510,13 @@ recipe(price ~ ., data = training_df) %&gt;%
 #### Descriptive statistics of the estimated price-to-value
 
 
-```
-## Error in mutate(., qb = lubridate::floor_date(date_end, "quarter"), qe = lubridate::ceiling_date(date_end, : object 'surv_raw_df' not found
-```
+|Quarter         | Min (%) | Lower quartile (%) | Median (%) | Higher quartile (%) | Max (%) | Standard deviation (%p) |
+|:---------------|:-------:|:------------------:|:----------:|:-------------------:|:-------:|:-----------------------:|
+|2021/04-2021/07 | -48.13% |       -2.83%       |   -0.08%   |        2.66%        | 61.95%  |          5.47%          |
+|2021/07-2021/10 | -51.17% |       -2.69%       |   0.06%    |        2.87%        | 208.45% |          5.71%          |
+|2021/10-2022/01 | -50.43% |       -2.75%       |   0.07%    |        2.96%        | 198.91% |          5.87%          |
+|2022/01-2022/04 | -47.48% |       -2.63%       |   0.10%    |        2.89%        | 124.62% |          5.63%          |
+|Total           | -51.17% |       -2.72%       |   0.06%    |        2.89%        | 208.45% |          5.74%          |
 
 *Price-to-value is defined as the proportion of offer price and the predicted price from XGBoost. To report in this table we subtracted 1 from the values.*
 
@@ -638,18 +532,7 @@ class: inverse, middle, center
 
 #### Survival curve showing the probability of not having disappeared from the supply
 
-
-```
-## Error in mutate(., qb = lubridate::floor_date(date_start, "quarter"), : object 'duration_df' not found
-```
-
-```
-## Error in survfit(formula = Surv(duration, sold) ~ 1, data = km_df): could not find function "survfit"
-```
-
-```
-## Error in ggsurvplot(km_all, risk.table = FALSE, conf.int = TRUE, xlim = c(0, : could not find function "ggsurvplot"
-```
+&lt;embed src="figures/unnamed-chunk-34-1.pdf" width="700px" height="450px" style="display: block; margin: auto;" type="application/pdf" /&gt;
 
 ---
 
@@ -711,10 +594,7 @@ where `\(i\)` refers to individual cars and `\(j\)` refers to explanatory variab
 
 #### K-fold cross-validation for finding the optimal lambda hyperparameter
 
-
-```
-## Error in plot(cvfit): object 'cvfit' not found
-```
+&lt;embed src="figures/unnamed-chunk-35-1.pdf" width="700px" height="450px" style="display: block; margin: auto;" type="application/pdf" /&gt;
 
 ---
 
@@ -722,10 +602,7 @@ where `\(i\)` refers to individual cars and `\(j\)` refers to explanatory variab
 
 #### Estimated coefficients of the Cox models
 
-
-```
-## Error in tidy(fit_cox, conf.int = T): could not find function "tidy"
-```
+&lt;embed src="figures/unnamed-chunk-36-1.pdf" width="700px" height="450px" style="display: block; margin: auto;" type="application/pdf" /&gt;
 
 ---
 
@@ -733,10 +610,7 @@ where `\(i\)` refers to individual cars and `\(j\)` refers to explanatory variab
 
 #### Estimated coefficients of the Cox models
 
-
-```
-## Error in tidy(fit_cox, conf.int = T): could not find function "tidy"
-```
+&lt;embed src="figures/unnamed-chunk-37-1.pdf" width="700px" height="450px" style="display: block; margin: auto;" type="application/pdf" /&gt;
 
 ---
 
@@ -744,10 +618,7 @@ where `\(i\)` refers to individual cars and `\(j\)` refers to explanatory variab
 
 #### Survival model's response to the change of price-to-value
 
-
-```
-## Error in predict_quantile_prob(., .fit = fit_cox, seq(from = 0.1, to = 0.9, : could not find function "predict_quantile_prob"
-```
+&lt;embed src="figures/unnamed-chunk-38-1.pdf" width="700px" height="350px" style="display: block; margin: auto;" type="application/pdf" /&gt;
 
 *To capture the partial effect of price-to-value assuming that all other variables are unchanged, numeric predictors are fixed at their medians, while categorical and logical variables are fixed at their modes. The monotone increasing red line means that if the price-to-value is lower (the ratio of the offer price to the predicted price is higher), then the median selling time is higher.*
 

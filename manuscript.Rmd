@@ -74,7 +74,7 @@ download_days <- prices_df %>%
 
 `r granatlib::md_insert("markdown/handling_missing_data.md")`
 
-```{r cars_visdat, dev='png'}
+```{r dev='png'}
 load("data/cars_data.RData")
 names_to_select <- cars_data %>% 
   names %>% 
