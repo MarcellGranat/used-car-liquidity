@@ -240,14 +240,10 @@ prices_df
 
 .pull-right[
 
-##### Assumptions
+##### Assumption
 
 .content-box-red[
-**1.** If a car is available on the website one day but not the next, it has been sold at the last listed price.
-]
-
-.content-box-red[
-**2.** If a car is available on the website one day but not the next, it has been sold at the last listed price.
+If a car is available on the website one day but not the next, it has been sold at the last listed price.
 ]
 
 ]
